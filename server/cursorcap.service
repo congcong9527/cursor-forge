@@ -1,0 +1,15 @@
+[Unit]
+Description=CursorForge headless capture service (mouse.livepartner.fans)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/.nvm/versions/node/v16.20.2/bin/node /www/cfcap/capture.js
+Restart=always
+RestartSec=3
+User=root
+WorkingDirectory=/www/cfcap
+Environment=HOME=/root
+
+[Install]
+WantedBy=multi-user.target

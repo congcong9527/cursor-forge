@@ -1,0 +1,11 @@
+# 调试产物 / 构建中间件不入库
+assets/verify/
+check.js
+index.v4.bak.html
+assets/build-*.py
+assets/lp-data*.js
+assets/lp-elems*.json
+assets/lp-raw*.json
+__pycache__/
+*.pyc
+.DS_Store

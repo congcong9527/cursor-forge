@@ -1,0 +1,14 @@
+[Unit]
+Description=CursorForge same-origin fetch gateway (mouse.livepartner.fans)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/.nvm/versions/node/v16.20.2/bin/node /www/wwwroot/mouse.livepartner.fans/server/fetch-gateway.js
+Restart=always
+RestartSec=3
+User=root
+WorkingDirectory=/www/wwwroot/mouse.livepartner.fans/server
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,2657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CursorForge · 光标工厂 — 多光标协作搭建动效生成器 v3</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236c5cff'/%3E%3Cpath d='M11 8l0 14 4-3.4 2.4 5.4 2.8-1.2-2.4-5.4 5.2-.6z' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#0e0e14;--panel:#16161f;--panel2:#1d1d29;--border:#26262f;--border2:#34343f;
+  --text:#f0f0f4;--muted:#9a9aa8;--dim:#63636f;--accent:#6c5cff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;font-size:14px;overflow:hidden;height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.topbar{height:54px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 16px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+.logo .mark{width:24px;height:24px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+.logo .mark svg{width:14px;height:14px}
+.ver{font-size:10.5px;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:1.5px 7px;font-weight:600}
+.topbar .spacer{flex:1}
+.urlgen{display:flex;align-items:center;gap:6px;margin-left:2px}
+.urlgen input{width:clamp(170px,21vw,330px);background:var(--panel2);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;outline:none;transition:border-color .2s}
+.urlgen input:focus{border-color:var(--accent)}
+.urlgen input::placeholder{color:var(--dim)}
+.urlgen .btn{padding:7px 11px;font-size:12.5px;white-space:nowrap}
+.urlgen .btn:disabled{opacity:.5;cursor:wait}
+.genstat{font-size:11px;color:var(--muted);max-width:200px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.genstat.busy{color:var(--accent)}
+.genstat.err{color:#ff8f8f}
+@media(max-width:1280px){.genstat{display:none}}
+@media(max-width:900px){.urlgen input{width:150px}.urlgen #packBtn,.urlgen #restoreBtn{display:none}}
+.btn{border:1px solid var(--border2);background:var(--panel2);color:var(--text);border-radius:9px;padding:7px 14px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:#4a4a5a}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn-primary:hover{background:#7d6fff}
+.icon-btn{width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.icon-btn:hover{color:var(--text);border-color:var(--border2)}
+.sel{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-size:12.5px;outline:none}
+.main{flex:1;display:grid;grid-template-columns:1fr 296px;min-height:0}
+.center{display:flex;flex-direction:column;min-width:0}
+.stage-wrap{flex:1;display:grid;place-items:center;padding:20px 20px 10px;min-height:0}
+#stage{border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -25px rgba(0,0,0,.9),0 0 0 1px var(--border2);background:#08080c}
+#stage canvas{display:block;width:100%;height:100%}
+.timeline{display:flex;align-items:center;gap:12px;padding:12px 24px 16px;flex-shrink:0}
+.timeline .time{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);width:104px;text-align:center}
+input[type=range]{-webkit-appearance:none;flex:1;height:22px;background:none}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--border2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--text);margin-top:-5px}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
+.rpanel{border-left:1px solid var(--border);overflow-y:auto;background:var(--panel)}
+.rpanel section{border-bottom:1px solid var(--border);padding:15px 16px 17px}
+.rpanel h6{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:13px}
+.ctl{margin-bottom:13px}.ctl:last-child{margin-bottom:0}
+.ctl .row{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px}
+.ctl .row .val{color:var(--muted);font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+.segw{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:2.5px;gap:2px}
+.segw button{flex:1;padding:6px 4px;border-radius:7px;font-size:12px;color:var(--muted);font-weight:500;cursor:pointer;border:none;background:none}
+.segw button.on{background:#2e2e3e;color:var(--text)}
+input[type=color]{width:34px;height:26px;border:1px solid var(--border2);border-radius:7px;background:none;padding:2px;cursor:pointer}
+.color-inline{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.txt{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;outline:none}
+.chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;margin-bottom:10px}
+.chk input{accent-color:var(--accent);width:15px;height:15px}
+.note{color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:8px}
+#modal{position:fixed;inset:0;z-index:200;background:rgba(5,5,8,.72);display:grid;place-items:center}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border:1px solid var(--border2);border-radius:16px;padding:28px;width:380px}
+.mbox h3{font-size:16px;margin-bottom:6px}
+.mbox .sub{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+.pbar{height:7px;border-radius:4px;background:#23232e;overflow:hidden;margin-bottom:10px}
+.pbar i{display:block;height:100%;background:var(--accent);width:0%}
+.mrow{display:flex;justify-content:space-between;align-items:center;font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);background:#20202c;border:1px solid var(--border2);padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:all .25s;z-index:300}
+#toast.show{opacity:1;transform:translateX(-50%)}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#2b2b36;border-radius:5px}
+/* 网址生成失败诊断 / 粘贴源码 */
+#genHelp{position:fixed;inset:0;z-index:210;background:rgba(5,5,8,.78);display:grid;place-items:center}
+#genHelp[hidden],#genHelp [hidden]{display:none}
+.mbox.wide{width:min(600px,calc(100vw - 40px))}
+.gh-lead{color:var(--muted);font-size:12.5px;line-height:1.8;margin-bottom:13px}
+.gh-lead b{color:var(--text);font-weight:600}
+.diag{background:#101018;border:1px solid var(--border);border-radius:9px;padding:11px 13px;font:11.5px/1.85 ui-monospace,Consolas,monospace;color:#e0a8a8;white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;margin-bottom:4px}
+.gh-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.gh-btns .btn{flex:1;min-width:110px}
+#srcTa{width:100%;height:238px;resize:vertical;background:#101018;border:1px solid var(--border2);border-radius:9px;color:var(--text);font:11.5px/1.6 ui-monospace,Consolas,monospace;padding:11px;outline:none}
+#srcTa:focus{border-color:var(--accent)}
+.gh-tip{color:var(--dim);font-size:11.5px;line-height:1.7;margin-top:10px}
+.genstat.err{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.genstat.err:hover{color:#ffb4b4}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo"><span class="mark"><svg viewBox="0 0 24 24" fill="white"><path d="M6 3l0 17 4.6-3.9 2.7 6.1 3.2-1.4-2.7-6.1 5.9-.7z"/></svg></span>CursorForge · 光标工厂</span>
+  <span class="ver">v3</span>
+  <div class="urlgen">
+    <input id="urlIn" type="text" placeholder="粘贴网址，自动生成搭建动效…" spellcheck="false" autocomplete="off">
+    <button class="btn btn-primary" id="genBtn">生成</button>
+    <button class="btn" id="packBtn" title="导入站点数据包（.json + .png）或网页源码（.html）">导入</button>
+    <button class="btn" id="restoreBtn" title="恢复内置官网演示">还原</button>
+  </div>
+  <span class="genstat" id="genStat"></span>
+  <span class="spacer"></span>
+  <input type="file" id="packIn" accept=".json,.png,.html,.htm,application/json,image/png,text/html" multiple hidden>
+  <button class="icon-btn" id="playBtn" title="播放/暂停（空格）"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+  <button class="icon-btn" id="restartBtn" title="回到开头"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5v14M18 5l-9 7 9 7z"/></svg></button>
+  <button class="btn" id="shuffleBtn">重新编排</button>
+  <button class="btn btn-primary" id="exportBtn2">导出</button>
+</div>
+<div class="main">
+  <div class="center">
+    <div class="stage-wrap" id="stageWrap"><div id="stage"><canvas id="cv"></canvas></div></div>
+    <div class="timeline">
+      <span class="time" id="timeLbl">0.0s</span>
+      <input type="range" id="scrub" min="0" max="1000" value="0">
+    </div>
+  </div>
+  <div class="rpanel">
+    <section><h6>场景</h6>
+      <div class="ctl"><div class="row"><span>页面模板</span></div>
+        <select class="sel" id="presetSel" style="width:100%">
+          <option value="lp">官网实拍（livepartner.fans）</option>
+          <option value="saas">SaaS 落地页</option>
+          <option value="shop">电商推广页</option>
+          <option value="dash">数据看板</option>
+        </select>
+      </div>
+      <div class="ctl"><div class="row"><span>主标题文案</span></div>
+        <input class="txt" id="titleInput" value="让产品发布快人一步" maxlength="24">
+      </div>
+      <div class="ctl"><div class="color-inline">主题色 <input type="color" id="accent" value="#6c5cff"></div></div>
+      <div class="ctl"><div class="segw" id="themeSeg"><button data-v="dark" class="on">深色页面</button><button data-v="light">浅色页面</button></div></div>
+      <label class="chk"><input type="checkbox" id="c_skel" checked>绘制前显示线框骨架</label>
+      <label class="chk"><input type="checkbox" id="c_confetti" checked>结尾撒花 + 徽章</label>
+    </section>
+    <section><h6>运镜与特效</h6>
+      <label class="chk"><input type="checkbox" id="c_cam" checked>镜头自动推拉跟随</label>
+      <label class="chk"><input type="checkbox" id="c_trail" checked>光标运动拖尾</label>
+      <label class="chk"><input type="checkbox" id="c_guides" checked>成型对齐辅助线</label>
+      <label class="chk"><input type="checkbox" id="c_spark" checked>成型粒子迸发</label>
+    </section>
+    <section><h6>光标</h6>
+      <div class="ctl"><div class="row"><span>光标数量</span><span class="val" id="v_nCur"></span></div>
+        <input type="range" id="r_nCur" min="4" max="24" step="1" value="24"></div>
+      <div class="ctl"><div class="row"><span>动效速度</span><span class="val" id="v_speed"></span></div>
+        <input type="range" id="r_speed" min="0.5" max="2" step="0.05" value="1"></div>
+      <label class="chk"><input type="checkbox" id="c_names" checked>显示光标名字牌</label>
+    </section>
+    <section><h6>导出</h6>
+      <div class="ctl"><div class="segw" id="fmtSeg"><button data-v="mp4" class="on">MP4</button><button data-v="webm">WebM</button><button data-v="gif">GIF</button><button data-v="png">PNG</button></div></div>
+      <div class="ctl"><div class="segw" id="fpsSeg"><button data-v="24">24 fps</button><button data-v="30" class="on">30 fps</button><button data-v="60">60 fps</button></div></div>
+      <button class="btn btn-primary" id="exportBtn" style="width:100%;padding:11px;font-weight:700">导出动画</button>
+      <div class="note">每只光标的完整动作：按住左上角 → 斜拉到右下角成型 → 松手 → 回到中心微调位置 → 确认离开。导出整段时间轴，MP4/WebM 本地录制，GIF 自动压缩，PNG 为当前帧。</div>
+    </section>
+  </div>
+</div>
+<div id="modal" hidden><div class="mbox">
+  <h3 id="mTitle">导出中…</h3><div class="sub" id="mSub"></div>
+  <div class="pbar"><i id="mBar"></i></div>
+  <div class="mrow"><span id="mPct">0%</span><button class="btn" id="mCancel">取消</button></div>
+</div></div>
+<div id="genHelp" hidden><div class="mbox wide">
+  <div id="helpView">
+    <h3>无法自动读取该网站</h3>
+    <div class="gh-lead">
+      线上版本是<b>纯静态页面</b>，浏览器出于同源策略（CORS）不允许 JS 直接读取别的网站的 HTML；
+      原本用于中转的公共代理目前也都不可用。这不是动效生成出错，<b>只是拿不到页面数据</b>。<br>
+      下面三条通道都不依赖跨域，任选其一即可继续生成。
+    </div>
+    <div class="diag" id="ghDiag"></div>
+    <div class="gh-btns">
+      <button class="btn btn-primary" id="ghSrc">粘贴网页源码</button>
+      <button class="btn" id="ghImport">导入数据包 / .html</button>
+      <button class="btn" id="ghRetry">重试</button>
+      <button class="btn" id="ghClose">关闭</button>
+    </div>
+    <div class="gh-tip">提示：把网址发给我，我可以用本机浏览器采集好站点数据包并部署，之后直接输入该网址即可一键生成。</div>
+  </div>
+  <div id="srcView" hidden>
+    <h3>粘贴网页源码</h3>
+    <div class="gh-lead">在目标网站按 <b>Ctrl+U</b> 打开源代码，全选复制后粘贴到下面。页面会在同源沙箱内渲染并解析真实元素布局，<b>完全不需要联网代理</b>。</div>
+    <textarea id="srcTa" spellcheck="false" placeholder="<!DOCTYPE html> … 在此粘贴完整 HTML 源码 …"></textarea>
+    <div class="gh-btns">
+      <button class="btn btn-primary" id="srcGo">解析并生成</button>
+      <button class="btn" id="srcBack">返回</button>
+      <button class="btn" id="srcCancel">取消</button>
+    </div>
+  </div>
+</div></div>
+<div id="toast"></div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const mod=(a,n)=>((a%n)+n)%n,frac=v=>v-Math.floor(v),clamp=(v,a,b)=>v<a?a:v>b?b:v,lerp=(a,b,k)=>a+(b-a)*k;
+const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const easeOut=t=>1-Math.pow(1-t,3);
+const easeBack=t=>{const c=1.70158;t=clamp(t,0,1);return 1+2.70158*Math.pow(t-1,3)+1.70158*Math.pow(t-1,2)};
+function rnd(s){const x=Math.sin(s*127.1+311.7)*43758.5453;return x-Math.floor(x)}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+function rr(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function shiftColor(hex,deg){const n=parseInt(hex.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=mod(r+deg,256);g=mod(g+Math.round(deg*0.5),256);b=mod(b+Math.round(deg*0.25),256);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}
+
+/* ================= world layout ================= */
+window.__errs=[];addEventListener("error",e=>__errs.push(e.message+" @line "+e.lineno));
+const W=1600,H=900;
+const WIN={x:170,y:24,w:1290,h:852,chrome:48};
+const CT={x:WIN.x+15,y:WIN.y+WIN.chrome,w:WIN.w-30,h:WIN.h-WIN.chrome-15};
+/* ---- 官网实拍模式：livepartner.fans 元素级布局（DOM 实测，与整页截图同基准） ---- */
+let LPDATA={"vw":985,"docH":6503,"backs":[{"y":0,"h":116,"bg":"rgb(6, 6, 14)"},{"y":116,"h":644,"bg":"rgb(20, 20, 31)"},{"y":760,"h":1048,"bg":"rgb(3, 3, 3)"},{"y":1808,"h":833,"bg":"rgb(13, 13, 18)"},{"y":2641,"h":930,"bg":"rgb(13, 13, 18)"},{"y":3475,"h":436,"bg":"rgb(3, 3, 3)"},{"y":4814,"h":914,"bg":"rgb(3, 3, 3)"},{"y":5957,"h":471,"bg":"rgb(3, 3, 3)"},{"y":6428,"h":75,"bg":"rgb(3, 3, 3)"}],"elems":[{"tag":"a","x":280,"y":45,"w":51,"h":26,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"relative","txt":"首页","kind":"link","scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":351,"y":45,"w":51,"h":26,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"relative","txt":"产品","kind":"link","scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":421,"y":45,"w":69,"h":26,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"relative","txt":"软件库","kind":"link","scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":510,"y":45,"w":71,"h":26,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"relative","txt":"Bo云盘","kind":"link","scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":601,"y":45,"w":83,"h":26,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"relative","txt":"APP下载","kind":"link","scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h1","x":49,"y":285,"w":887,"h":150,"cls":"heading","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":70,"pos":"static","txt":"带货主播让本色更出色","kind":"text","bt":[142,174,207],"bb":[127,165,189],"cap":1,"vivid":0,"scene":0,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":22,"y":856,"w":414,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"产品特点","kind":"text","bt":[3,3,3],"bb":[3,3,3],"cap":0,"vivid":0,"scene":1,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":988,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":1,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":265,"y":988,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":1,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":507,"y":988,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":1,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":750,"y":988,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":1,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":1361,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":2,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":265,"y":1361,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":2,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":507,"y":1361,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":2,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":750,"y":1361,"w":213,"h":343,"cls":"sc-product-item style-2","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":2,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":22,"y":1901,"w":414,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"完美支持","kind":"text","bt":[13,13,18],"bb":[13,13,18],"cap":0,"vivid":0,"scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"button","x":834,"y":1918,"w":128,"h":56,"cls":"sc-button style letter style-2","bg":"rgb(220, 57, 252)","img":true,"bd":false,"sh":false,"r":100,"fs":15,"pos":"relative","txt":"","kind":"ctrl","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":892,"y":1935,"w":32,"h":19,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":16,"pos":"static","txt":"更多","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":107,"y":2023,"w":63,"h":40,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"抖音&Tiktok","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":269,"y":2032,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"快手","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":431,"y":2032,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"小红书","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":592,"y":2032,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"微信","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":754,"y":2032,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"淘宝","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":916,"y":2032,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"京东","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":107,"y":2152,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"拼多多","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":269,"y":2152,"w":47,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"Zoom","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":431,"y":2152,"w":100,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"GoogleMeet","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":592,"y":2152,"w":86,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"WhatsApp","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":754,"y":2152,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"斗鱼","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":916,"y":2152,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"虎牙","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":107,"y":2272,"w":42,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"NOW","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":431,"y":2272,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"映客","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":592,"y":2272,"w":48,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"bilibili","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":754,"y":2272,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"酷狗","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":916,"y":2272,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"陌陌","kind":"link","scene":3,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":107,"y":2392,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"花椒","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":269,"y":2392,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"得物","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":431,"y":2392,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"西瓜","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":592,"y":2392,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"一直播","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":754,"y":2392,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"六间房","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":916,"y":2392,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"蘑菇街","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":107,"y":2512,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"亚马逊","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":269,"y":2512,"w":70,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"YouTube","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":431,"y":2512,"w":36,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"美团","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":592,"y":2512,"w":78,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"Telegram","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":916,"y":2512,"w":54,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"Twitch","kind":"link","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":22,"y":2733,"w":450,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"内容中心","kind":"text","bt":[13,13,18],"bb":[13,13,18],"cap":0,"vivid":0,"scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":2865,"w":212,"h":432,"cls":"sc-product-item style-3 bg-color-dark","bg":"rgb(3, 3, 3)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":264,"y":2865,"w":212,"h":432,"cls":"sc-product-item style-3 bg-color-dark","bg":"rgb(3, 3, 3)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":505,"y":2865,"w":212,"h":410,"cls":"sc-product-item style-3 bg-color-dark","bg":"rgb(3, 3, 3)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":747,"y":2865,"w":212,"h":410,"cls":"sc-product-item style-3 bg-color-dark","bg":"rgb(3, 3, 3)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":4,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":89,"y":3529,"w":168,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"明星主播","kind":"text","bt":[3,3,3],"bb":[3,3,3],"cap":0,"vivid":0,"scene":5,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":89,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":228,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":368,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":507,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":647,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":786,"y":3613,"w":109,"h":237,"cls":"sc-author","bg":"","img":false,"bd":true,"sh":false,"r":12,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":22,"y":4005,"w":168,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"明星机构","kind":"text","bt":[52,52,68],"bb":[52,52,68],"cap":0,"vivid":0,"scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":4090,"w":455,"h":298,"cls":"sc-author-card","bg":"rgba(99, 69, 237, 0.07)","img":false,"bd":true,"sh":false,"r":7,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":507,"y":4090,"w":455,"h":298,"cls":"sc-author-card","bg":"rgba(99, 69, 237, 0.07)","img":false,"bd":true,"sh":false,"r":7,"fs":15,"pos":"relative","txt":"","kind":"card","scene":6,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":4416,"w":455,"h":298,"cls":"sc-author-card","bg":"rgba(99, 69, 237, 0.07)","img":false,"bd":true,"sh":false,"r":7,"fs":15,"pos":"relative","txt":"","kind":"card","scene":7,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":507,"y":4416,"w":455,"h":298,"cls":"sc-author-card","bg":"rgba(99, 69, 237, 0.07)","img":false,"bd":true,"sh":false,"r":7,"fs":15,"pos":"relative","txt":"","kind":"card","scene":7,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":130,"y":4868,"w":294,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"新功能研发中心","kind":"text","bt":[3,3,3],"bb":[3,3,3],"cap":0,"vivid":0,"scene":8,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":89,"y":5060,"w":389,"h":527,"cls":"sc-product-item","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":8,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":508,"y":5060,"w":389,"h":527,"cls":"sc-product-item","bg":"rgb(52, 52, 68)","img":false,"bd":true,"sh":false,"r":20,"fs":15,"pos":"static","txt":"","kind":"card","scene":8,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":961,"y":5462,"w":24,"h":22,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":18,"pos":"static","txt":"智能3D直播转盘","kind":"link","scene":9,"detail":0,"col":"rgb(240,240,248)"},{"tag":"div","x":22,"y":5833,"w":940,"h":224,"cls":"new-letter-inner style-2 flex","bg":"","img":true,"bd":false,"sh":false,"r":30,"fs":15,"pos":"relative","txt":"","kind":"card","scene":9,"detail":0,"col":"rgb(240,240,248)"},{"tag":"h3","x":92,"y":5892,"w":351,"h":42,"cls":"heading","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":42,"pos":"static","txt":"订阅","kind":"text","bt":[110,68,238],"bb":[120,67,239],"cap":0,"vivid":1,"scene":9,"detail":0,"col":"rgb(240,240,248)"},{"tag":"input","x":443,"y":5892,"w":446,"h":77,"cls":"email","bg":"rgb(255, 255, 255)","img":false,"bd":false,"sh":false,"r":187,"fs":16,"pos":"static","txt":"","kind":"ctrl","scene":9,"detail":0,"col":"rgb(240,240,248)"},{"tag":"button","x":754,"y":5902,"w":125,"h":56,"cls":"sc-button style letter style-2","bg":"rgb(220, 57, 252)","img":true,"bd":false,"sh":false,"r":100,"fs":15,"pos":"absolute","txt":"","kind":"ctrl","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":310,"y":6180,"w":84,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"新功能开发中","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":499,"y":6180,"w":56,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"基本信息","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":799,"y":6181,"w":89,"h":23,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":16,"pos":"static","txt":"预售开启","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":310,"y":6214,"w":83,"h":42,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"直播小强X1发布","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":499,"y":6214,"w":70,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"隐私及保护","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":799,"y":6214,"w":89,"h":15,"cls":"post-date","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":13,"pos":"static","txt":"2023-02-28","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"p","x":22,"y":6236,"w":213,"h":100,"cls":"sub-widget-logo","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"致力于整合直播机硬件资源，完善直播机软件生态，为消费者提","kind":"card","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":499,"y":6248,"w":56,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"联系我们","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":799,"y":6272,"w":128,"h":23,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":16,"pos":"static","txt":"生产服务器试运营","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":310,"y":6273,"w":47,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"BO云盘","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":799,"y":6305,"w":84,"h":15,"cls":"post-date","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":13,"pos":"static","txt":"2023-03-12","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":310,"y":6307,"w":70,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"relative","txt":"七色堇音乐","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":608,"y":6457,"w":59,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"static","txt":"版权所有","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":667,"y":6457,"w":139,"h":17,"cls":"","bg":"","img":false,"bd":false,"sh":false,"r":0,"fs":14,"pos":"static","txt":"粤ICP备2023005469号","kind":"link","scene":10,"detail":0,"col":"rgb(240,240,248)"},{"tag":"a","x":700,"y":35,"w":46,"h":46,"cls":"sc-button wallet  style-2","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[6,6,14],"bb":[6,6,14],"vivid":0,"detail":1,"scene":0},{"tag":"img","x":110,"y":44,"w":151,"h":28,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[6,6,14],"bb":[246,246,246],"vivid":0,"detail":1,"scene":0},{"tag":"img","x":785,"y":46,"w":24,"h":24,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":0},{"tag":"img","x":843,"y":49,"w":18,"h":18,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[99,69,237],"bb":[99,69,237],"vivid":1,"detail":1,"scene":0},{"tag":"img","x":715,"y":50,"w":16,"h":16,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[220,57,252],"bb":[220,57,252],"vivid":1,"detail":1,"scene":0},{"tag":"p","x":49,"y":463,"w":887,"h":32,"cls":"sub-heading","r":0,"fs":20,"txt":"搞定人货场，人人轻松带货做主播。","kind":"txt","col":"rgb(255,255,255)","fw":"500","bt":[124,162,187],"bb":[121,161,186],"vivid":0,"detail":1,"scene":0},{"tag":"span","x":84,"y":553,"w":89,"h":19,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(20,22,27)","fw":"700","bt":[255,255,255],"bb":[255,255,255],"vivid":0,"detail":1,"scene":0},{"tag":"span","x":464,"y":690,"w":20,"h":20,"cls":"swiper-pagination-bullet swiper-","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[96,149,192],"bb":[92,146,188],"vivid":1,"detail":1,"scene":1},{"tag":"div","x":842,"y":873,"w":55,"h":55,"cls":"swiper-button-prev btn-slide-pre","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":1},{"tag":"div","x":907,"y":873,"w":55,"h":55,"cls":"swiper-button-next btn-slide-nex","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":1},{"tag":"p","x":22,"y":908,"w":414,"h":28,"cls":"desc","r":0,"fs":18,"txt":"全方位解决个人直播痛点，所有功能为您量身定制。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":1},{"tag":"span","x":84,"y":953,"w":89,"h":19,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(20,22,27)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":1},{"tag":"img","x":23,"y":989,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[232,172,50],"bb":[197,124,57],"vivid":1,"detail":1,"scene":1},{"tag":"img","x":266,"y":989,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[112,133,140],"bb":[198,164,237],"vivid":0,"detail":1,"scene":1},{"tag":"img","x":508,"y":989,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[234,251,252],"bb":[214,179,132],"vivid":0,"detail":1,"scene":1},{"tag":"img","x":751,"y":989,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[167,149,154],"bb":[109,148,179],"vivid":0,"detail":1,"scene":1},{"tag":"span","x":105,"y":1097,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[164,125,135],"bb":[105,106,121],"vivid":0,"detail":1,"scene":1},{"tag":"span","x":347,"y":1097,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[168,198,205],"bb":[214,219,213],"vivid":0,"detail":1,"scene":1},{"tag":"span","x":590,"y":1097,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[177,183,163],"bb":[223,231,223],"vivid":0,"detail":1,"scene":1},{"tag":"span","x":832,"y":1097,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[28,57,94],"bb":[1,24,70],"vivid":0,"detail":1,"scene":1},{"tag":"label","x":128,"y":1133,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[173,65,243],"bb":[181,59,247],"vivid":1,"detail":1,"scene":1},{"tag":"label","x":371,"y":1133,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[172,65,244],"bb":[183,59,247],"vivid":1,"detail":1,"scene":1},{"tag":"label","x":613,"y":1133,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[173,65,243],"bb":[182,59,247],"vivid":1,"detail":1,"scene":1},{"tag":"label","x":856,"y":1133,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[148,65,243],"bb":[182,59,247],"vivid":1,"detail":1,"scene":1},{"tag":"a","x":36,"y":1182,"w":198,"h":43,"cls":"","r":0,"fs":18,"txt":"一人一幕开启现场直播，影视级抠图融入感","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":278,"y":1182,"w":198,"h":65,"cls":"","r":0,"fs":18,"txt":"元万设计师请回家，直播带货一品一场景轻","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":521,"y":1182,"w":198,"h":43,"cls":"","r":0,"fs":18,"txt":"上万正版模板免费使用，场景编辑手机直接","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":763,"y":1182,"w":195,"h":65,"cls":"","r":0,"fs":18,"txt":"主播专用云盘系统，电脑/手机/微信小程","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":66,"y":1297,"w":105,"h":18,"cls":"title","r":0,"fs":15,"txt":"虚拟直播间打造","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[63,63,77],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":309,"y":1297,"w":105,"h":18,"cls":"title","r":0,"fs":15,"txt":"一键装修直播间","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[34,34,50],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":545,"y":1297,"w":117,"h":18,"cls":"title","r":0,"fs":15,"txt":"MM正版素材商城","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[34,34,50],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":808,"y":1297,"w":76,"h":18,"cls":"title","r":0,"fs":15,"txt":"Bo主播云盘","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[34,34,50],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"img","x":23,"y":1362,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[28,41,38],"bb":[216,146,108],"vivid":0,"detail":1,"scene":2},{"tag":"img","x":266,"y":1362,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[108,111,117],"bb":[60,54,75],"vivid":0,"detail":1,"scene":2},{"tag":"img","x":508,"y":1362,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[94,80,165],"bb":[177,124,246],"vivid":0,"detail":1,"scene":2},{"tag":"img","x":751,"y":1362,"w":211,"h":157,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[244,195,97],"bb":[231,162,104],"vivid":1,"detail":1,"scene":2},{"tag":"span","x":105,"y":1470,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[166,134,159],"bb":[166,175,191],"vivid":0,"detail":1,"scene":2},{"tag":"span","x":347,"y":1470,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[96,77,206],"bb":[221,150,199],"vivid":1,"detail":1,"scene":2},{"tag":"span","x":590,"y":1470,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[249,128,107],"bb":[141,119,110],"vivid":1,"detail":1,"scene":2},{"tag":"span","x":832,"y":1470,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[39,155,156],"bb":[29,194,189],"vivid":1,"detail":1,"scene":2},{"tag":"label","x":128,"y":1506,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[170,65,243],"bb":[181,59,247],"vivid":1,"detail":1,"scene":2},{"tag":"label","x":371,"y":1506,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[148,62,243],"bb":[183,59,247],"vivid":1,"detail":1,"scene":2},{"tag":"label","x":613,"y":1506,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[159,62,243],"bb":[182,59,247],"vivid":1,"detail":1,"scene":2},{"tag":"label","x":856,"y":1506,"w":78,"h":25,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[173,65,243],"bb":[182,59,247],"vivid":1,"detail":1,"scene":2},{"tag":"a","x":36,"y":1556,"w":196,"h":43,"cls":"","r":0,"fs":18,"txt":"独创15宫格播控交互，场景快照随时分享","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":278,"y":1556,"w":198,"h":43,"cls":"","r":0,"fs":18,"txt":"各种直播后服务应用，满足各路主播差异化","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":521,"y":1556,"w":198,"h":65,"cls":"","r":0,"fs":18,"txt":"遥控器/题词器/弹幕聚合功能信手拈来，","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"a","x":763,"y":1556,"w":188,"h":65,"cls":"","r":0,"fs":18,"txt":"独立布署MCN/公会SaaS系统，直","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":74,"y":1671,"w":90,"h":18,"cls":"title","r":0,"fs":15,"txt":"犀鸟播控系统","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[210,210,213],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":309,"y":1671,"w":105,"h":18,"cls":"title","r":0,"fs":15,"txt":"应用和服务大厅","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[106,106,117],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":574,"y":1671,"w":60,"h":18,"cls":"title","r":0,"fs":15,"txt":"小程序群","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[34,34,50],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"div","x":800,"y":1671,"w":93,"h":18,"cls":"title","r":0,"fs":15,"txt":"MCN公会系统","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[34,34,50],"bb":[34,34,50],"vivid":0,"detail":1,"scene":2},{"tag":"span","x":872,"y":1935,"w":52,"h":19,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[220,60,252],"bb":[209,59,250],"vivid":1,"detail":1,"scene":3},{"tag":"p","x":22,"y":1953,"w":414,"h":28,"cls":"desc","r":0,"fs":18,"txt":"完美支持全部安卓原生应用，不挑平台，不分国界。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":22,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":184,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":346,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":507,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":669,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":831,"y":2021,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":269,"y":2064,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"综合平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":431,"y":2064,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":592,"y":2064,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":754,"y":2064,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":916,"y":2064,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":107,"y":2073,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"综合平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":22,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":184,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":346,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":507,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":669,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":831,"y":2141,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":107,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":269,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"网络会议","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":431,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"网络会议","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":592,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":754,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"游戏直播","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[64,75,68],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":916,"y":2184,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"游戏平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,45],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":22,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":184,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":346,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":507,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":669,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":831,"y":2261,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"a","x":269,"y":2272,"w":24,"h":22,"cls":"","r":0,"fs":18,"txt":"YY","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":107,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"才艺平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":269,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":431,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":592,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"才艺平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":754,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"才艺平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"p","x":916,"y":2304,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":3},{"tag":"img","x":22,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":184,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":346,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":507,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":669,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":831,"y":2381,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":107,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":269,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":431,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":592,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":754,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":916,"y":2424,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":22,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":184,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":346,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":507,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":669,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":831,"y":2501,"w":75,"h":75,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"a","x":754,"y":2512,"w":13,"h":22,"cls":"","r":0,"fs":18,"txt":"X","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":107,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"电商平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":269,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"娱乐平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":431,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"外卖平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":592,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":754,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"社交平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":916,"y":2544,"w":60,"h":18,"cls":"","r":0,"fs":14,"txt":"游戏平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,45],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"div","x":748,"y":2748,"w":55,"h":55,"cls":"swiper-button-prev btn-slide-pre","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"div","x":813,"y":2748,"w":55,"h":55,"cls":"swiper-button-next btn-slide-nex","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"p","x":22,"y":2785,"w":450,"h":28,"cls":"desc","r":0,"fs":18,"txt":"优秀模板内容展示，全部正版模板，一键您也可以拥有。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":4},{"tag":"img","x":38,"y":2880,"w":180,"h":320,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[238,97,57],"bb":[90,164,155],"vivid":1,"detail":1,"scene":4},{"tag":"img","x":280,"y":2880,"w":180,"h":320,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[176,65,32],"bb":[147,57,156],"vivid":1,"detail":1,"scene":4},{"tag":"img","x":521,"y":2880,"w":180,"h":320,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[220,78,42],"bb":[220,78,42],"vivid":1,"detail":1,"scene":4},{"tag":"img","x":763,"y":2880,"w":180,"h":320,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[235,134,171],"bb":[241,162,198],"vivid":1,"detail":1,"scene":4},{"tag":"span","x":104,"y":3103,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[235,213,197],"bb":[229,191,165],"vivid":0,"detail":1,"scene":5},{"tag":"span","x":346,"y":3103,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[248,228,209],"bb":[248,227,209],"vivid":0,"detail":1,"scene":5},{"tag":"span","x":587,"y":3103,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[225,98,58],"bb":[37,131,87],"vivid":1,"detail":1,"scene":5},{"tag":"span","x":829,"y":3103,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[243,158,174],"bb":[255,191,198],"vivid":0,"detail":1,"scene":5},{"tag":"label","x":121,"y":3191,"w":72,"h":19,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[172,69,246],"bb":[173,59,246],"vivid":1,"detail":1,"scene":5},{"tag":"label","x":363,"y":3191,"w":72,"h":19,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[199,68,245],"bb":[174,59,246],"vivid":1,"detail":1,"scene":5},{"tag":"label","x":604,"y":3191,"w":72,"h":19,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[204,69,245],"bb":[172,58,246],"vivid":1,"detail":1,"scene":5},{"tag":"label","x":846,"y":3191,"w":72,"h":19,"cls":"","r":10,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"600","bt":[198,68,245],"bb":[173,58,246],"vivid":1,"detail":1,"scene":5},{"tag":"a","x":49,"y":3223,"w":162,"h":43,"cls":"","r":0,"fs":18,"txt":"电商双十一中国风直播","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":5},{"tag":"a","x":291,"y":3223,"w":162,"h":43,"cls":"","r":0,"fs":18,"txt":"国潮风年货节女装直播","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":5},{"tag":"a","x":532,"y":3223,"w":144,"h":22,"cls":"","r":0,"fs":18,"txt":"元宵节节日直播活","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":5},{"tag":"a","x":774,"y":3223,"w":90,"h":22,"cls":"","r":0,"fs":18,"txt":"母亲节直播","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":5},{"tag":"span","x":428,"y":3356,"w":20,"h":20,"cls":"swiper-pagination-bullet swiper-","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[13,13,18],"bb":[13,13,18],"vivid":0,"detail":1,"scene":5},{"tag":"div","x":91,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":94,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":230,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":233,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":370,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":373,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":509,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":512,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":648,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":652,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":788,"y":3643,"w":106,"h":100,"cls":"card-avatar","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":791,"y":3643,"w":100,"h":100,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":128,"y":3760,"w":32,"h":19,"cls":"","r":0,"fs":16,"txt":"辛巴","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":259,"y":3760,"w":48,"h":19,"cls":"","r":0,"fs":16,"txt":"李佳琦","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":407,"y":3760,"w":32,"h":19,"cls":"","r":0,"fs":16,"txt":"蛋蛋","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":530,"y":3760,"w":64,"h":19,"cls":"","r":0,"fs":16,"txt":"烈儿宝贝","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":678,"y":3760,"w":48,"h":19,"cls":"","r":0,"fs":16,"txt":"罗永浩","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":809,"y":3760,"w":64,"h":19,"cls":"","r":0,"fs":16,"txt":"时大漂亮","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":109,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[52,52,52],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":249,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[50,50,50],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":388,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[21,21,21],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":528,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":667,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"a","x":806,"y":3794,"w":69,"h":27,"cls":"sc-button btn-bordered-white","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":130,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":269,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":409,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":548,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":688,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"span","x":827,"y":3798,"w":28,"h":17,"cls":"","r":0,"fs":14,"txt":"关注","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":842,"y":3994,"w":55,"h":55,"cls":"swiper-button-prev btn-slide-pre","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[52,52,68],"bb":[73,72,87],"vivid":0,"detail":1,"scene":6},{"tag":"div","x":907,"y":3994,"w":55,"h":55,"cls":"swiper-button-next btn-slide-nex","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[52,52,68],"bb":[181,57,247],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":19,"y":4089,"w":462,"h":173,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[157,144,170],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":504,"y":4089,"w":462,"h":173,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[52,68,70],"vivid":0,"detail":1,"scene":6},{"tag":"img","x":210,"y":4220,"w":80,"h":80,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[144,108,138],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"img","x":695,"y":4220,"w":80,"h":80,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[79,46,70],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"a","x":214,"y":4316,"w":72,"h":22,"cls":"","r":0,"fs":18,"txt":"如涵控股","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[55,53,80],"bb":[111,110,129],"vivid":0,"detail":1,"scene":7},{"tag":"a","x":699,"y":4316,"w":72,"h":22,"cls":"","r":0,"fs":18,"txt":"交个朋友","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"div","x":23,"y":4343,"w":453,"h":18,"cls":"details","r":0,"fs":14,"txt":"国内有影响力的红人孵化公司","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"div","x":508,"y":4343,"w":453,"h":18,"cls":"details","r":0,"fs":14,"txt":"抖音生态营收TOP1的直播电商机构","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"img","x":19,"y":4415,"w":462,"h":173,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[2,7,16],"vivid":0,"detail":1,"scene":7},{"tag":"img","x":504,"y":4415,"w":462,"h":173,"cls":"","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[224,179,194],"vivid":0,"detail":1,"scene":7},{"tag":"img","x":210,"y":4547,"w":80,"h":80,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[37,12,27],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"img","x":695,"y":4547,"w":80,"h":80,"cls":"","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[250,134,170],"bb":[55,53,80],"vivid":1,"detail":1,"scene":7},{"tag":"a","x":226,"y":4643,"w":48,"h":22,"cls":"","r":0,"fs":18,"txt":"美one","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"a","x":717,"y":4643,"w":36,"h":22,"cls":"","r":0,"fs":18,"txt":"辛选","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"div","x":23,"y":4670,"w":453,"h":18,"cls":"details","r":0,"fs":14,"txt":"艺人网红孵化服务平台","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"div","x":508,"y":4670,"w":453,"h":18,"cls":"details","r":0,"fs":14,"txt":"头部直播电商企业","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[55,53,80],"bb":[55,53,80],"vivid":0,"detail":1,"scene":7},{"tag":"div","x":97,"y":4883,"w":12,"h":12,"cls":"icon","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[216,1,1],"bb":[255,0,0],"vivid":1,"detail":1,"scene":8},{"tag":"p","x":89,"y":4920,"w":403,"h":56,"cls":"desc","r":0,"fs":18,"txt":"我们只出创意不出成品，欢迎整机厂洽谈合作，共同打造直播硬件生态。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":8},{"tag":"div","x":776,"y":4944,"w":55,"h":55,"cls":"swiper-button-prev btn-slide-pre","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":8},{"tag":"div","x":841,"y":4944,"w":55,"h":55,"cls":"swiper-button-next btn-slide-nex","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(0,122,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":8},{"tag":"span","x":228,"y":5098,"w":10,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"5","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[104,68,238],"bb":[119,67,239],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":238,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[116,67,239],"bb":[130,66,241],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":252,"y":5098,"w":19,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"23","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[131,66,241],"bb":[146,64,243],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":271,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[147,64,243],"bb":[162,63,245],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":285,"y":5098,"w":20,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"26","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[163,63,245],"bb":[177,61,247],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":305,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[179,61,247],"bb":[194,60,249],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":319,"y":5098,"w":20,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"30","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[195,59,249],"bb":[210,58,251],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":647,"y":5098,"w":10,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"5","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[99,69,237],"bb":[113,68,239],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":657,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[110,68,238],"bb":[124,67,240],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":671,"y":5098,"w":19,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"23","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[125,66,240],"bb":[140,65,242],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":690,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[140,65,242],"bb":[155,64,244],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":704,"y":5098,"w":20,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"26","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[157,63,244],"bb":[171,62,246],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":724,"y":5098,"w":14,"h":22,"cls":"countdown__label","r":0,"fs":18,"txt":":","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[172,62,246],"bb":[187,60,248],"vivid":1,"detail":1,"scene":8},{"tag":"span","x":737,"y":5098,"w":20,"h":22,"cls":"countdown__value countdown__valu","r":0,"fs":18,"txt":"30","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[187,60,248],"bb":[202,59,250],"vivid":1,"detail":1,"scene":8},{"tag":"img","x":113,"y":5110,"w":341,"h":341,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[227,214,252],"bb":[255,255,255],"vivid":0,"detail":1,"scene":8},{"tag":"img","x":531,"y":5110,"w":341,"h":341,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[220,69,252],"bb":[255,255,255],"vivid":1,"detail":1,"scene":8},{"tag":"img","x":950,"y":5110,"w":35,"h":330,"cls":"","r":20,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":8},{"tag":"span","x":259,"y":5347,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[204,204,204],"bb":[204,204,204],"vivid":0,"detail":1,"scene":9},{"tag":"span","x":678,"y":5347,"w":48,"h":17,"cls":"","r":0,"fs":14,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[255,255,255],"bb":[255,255,255],"vivid":0,"detail":1,"scene":9},{"tag":"label","x":353,"y":5440,"w":76,"h":20,"cls":"","r":5,"fs":14,"txt":"直播工具","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[255,255,255],"bb":[156,137,244],"vivid":0,"detail":1,"scene":9},{"tag":"label","x":771,"y":5440,"w":76,"h":20,"cls":"","r":5,"fs":14,"txt":"直播工具","kind":"txt","col":"rgb(255,255,255)","fw":"600","bt":[255,255,255],"bb":[229,224,252],"vivid":0,"detail":1,"scene":9},{"tag":"a","x":124,"y":5473,"w":108,"h":22,"cls":"","r":0,"fs":18,"txt":"小熊直播助理","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[234,234,235],"vivid":0,"detail":1,"scene":9},{"tag":"a","x":542,"y":5473,"w":126,"h":22,"cls":"","r":0,"fs":18,"txt":"可折叠冷凝支架","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[52,52,68],"bb":[148,148,157],"vivid":0,"detail":1,"scene":9},{"tag":"div","x":961,"y":5498,"w":24,"h":36,"cls":"title","r":0,"fs":15,"txt":"小型","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":9},{"tag":"div","x":124,"y":5509,"w":330,"h":36,"cls":"title","r":0,"fs":15,"txt":"纯语音交互的直播助手，AI驱动完成各种助播功能。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":9},{"tag":"div","x":542,"y":5509,"w":330,"h":36,"cls":"title","r":0,"fs":15,"txt":"用于手机直播时双向制冷散热的手机支架，解决手机直播过程中过热问题。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[52,52,68],"bb":[52,52,68],"vivid":0,"detail":1,"scene":9},{"tag":"div","x":469,"y":5647,"w":46,"h":20,"cls":"swiper-pagination swiper-paginat","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[99,69,237],"vivid":0,"detail":1,"scene":9},{"tag":"span","x":473,"y":5647,"w":20,"h":20,"cls":"swiper-pagination-bullet swiper-","r":24,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[99,69,237],"vivid":0,"detail":1,"scene":9},{"tag":"span","x":788,"y":5920,"w":57,"h":19,"cls":"","r":0,"fs":16,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"700","bt":[209,58,251],"bb":[220,63,252],"vivid":1,"detail":1,"scene":10},{"tag":"p","x":92,"y":5944,"w":351,"h":56,"cls":"sub-heading","r":0,"fs":18,"txt":"第一时间获取直播小强的产品动态和行业资讯。","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[119,67,240],"bb":[131,66,241],"vivid":1,"detail":1,"scene":10},{"tag":"h5","x":310,"y":6133,"w":87,"h":18,"cls":"title-widget","r":0,"fs":18,"txt":"探索","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"h5","x":499,"y":6133,"w":140,"h":18,"cls":"title-widget","r":0,"fs":18,"txt":"服务","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"h5","x":710,"y":6133,"w":252,"h":18,"cls":"title-widget","r":0,"fs":18,"txt":"新闻动态","kind":"txt","col":"rgb(255,255,255)","fw":"700","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"img","x":22,"y":6143,"w":151,"h":28,"cls":"","r":0,"fs":36,"txt":"","kind":"icon","col":"rgb(220,57,252)","fw":"700","bt":[3,3,3],"bb":[176,169,176],"vivid":0,"detail":1,"scene":10},{"tag":"div","x":710,"y":6183,"w":70,"h":70,"cls":"post-img","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"img","x":710,"y":6183,"w":70,"h":41,"cls":"","r":7,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[0,0,0],"vivid":0,"detail":1,"scene":10},{"tag":"p","x":22,"y":6194,"w":213,"h":25,"cls":"sub-widget-logo","r":0,"fs":14,"txt":"Live For Live","kind":"txt","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"i","x":799,"y":6215,"w":11,"h":13,"cls":"far fa-calendar-week","r":0,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"div","x":710,"y":6274,"w":70,"h":70,"cls":"post-img","r":0,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10},{"tag":"img","x":710,"y":6274,"w":70,"h":39,"cls":"","r":7,"fs":15,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[21,23,34],"vivid":0,"detail":1,"scene":10},{"tag":"i","x":799,"y":6306,"w":11,"h":13,"cls":"far fa-calendar-week","r":0,"fs":13,"txt":"","kind":"icon","col":"rgb(255,255,255)","fw":"400","bt":[3,3,3],"bb":[3,3,3],"vivid":0,"detail":1,"scene":10}]};
+const LP={x:170,w:1260};
+LP.k=LP.w/LPDATA.vw; LP.H=LPDATA.docH*LP.k;
+const LPIMG=new Image();
+const LPIMG_BUILTIN="assets/lp-full.png";
+const LPDATA_BUILTIN=LPDATA;               // 「还原」按钮用：内置官网实拍数据
+LPIMG.src=LPIMG_BUILTIN;
+let SITE_LABEL="livepartner.fans";
+let lastGenUrl="";                         // 最近一次生成的网址（片头字幕展示用；须先于启动 generate() 声明）
+const isPage=()=>S.preset==="lp";
+const bx=b=>isPage()?LP.x+b.x:CT.x+b.x;
+const by=b=>isPage()?b.y:CT.y+b.y;
+/* ---- 像素级对齐 ----
+   DOM 文档高 6503，整页截图自然高度 6502，两者不能共用同一个纵向比例。
+   统一由「世界目标矩形」反算回截图的真实像素矩形：srcRect / drawCrop。
+   这样每个素材在落位后与最终成品图逐像素重合（含 review 整图）。 */
+function srcRect(x,y,w,h){
+  const iw=LPIMG.naturalWidth||LPDATA.vw, ih=LPIMG.naturalHeight||LPDATA.docH;
+  return [(x-LP.x)*iw/LP.w, y*ih/LP.H, w*iw/LP.w, h*ih/LP.H];
+}
+function drawCrop(x,y,w,h){
+  if(!LPIMG.complete||!LPIMG.naturalWidth)return false;
+  const s=srcRect(x,y,w,h);
+  ctx.drawImage(LPIMG,s[0],s[1],s[2],s[3],x,y,w,h);
+  return true;
+}
+/* 素材层级：不同素材处在不同的 z 层，绘制时从黑色层槽底下升上来 */
+const ZOF={band:0,card:1,link:2,ctrl:3,icon:4,text:5,txt:6};
+function layerZ(b){
+  if(b.type==="band")return 0;
+  return (b.detail?3:0)+(ZOF[b.kind]||2);
+}
+let seed=7;
+const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
+const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
+
+const S={preset:"lp",title:"让产品发布快人一步",accent:"#6c5cff",theme:"dark",
+  skel:true,confetti:true,nCur:24,speed:1,names:true,
+  cam:true,trail:true,guides:true,spark:true,
+  fmt:"mp4",fps:30,playing:true,clock:0};
+let script=null,evsByCursor=[],intro=null;
+
+/* 细节文字落在深色磨砂占位上，原站若用深色字则提亮，避免看不清 */
+function txtColor(s){
+  const m=(s||"").match(/\d+/g);
+  if(!m||m.length<3)return "rgb(240,240,248)";
+  const lum=0.299*(+m[0])+0.587*(+m[1])+0.114*(+m[2]);
+  return lum<170?"rgb(236,236,248)":s;
+}
+/* ================= page presets ================= */
+function presets(){
+  const B=[],P=(o)=>{o.drag=o.drag||0.5;B.push(o);return o};
+  if(S.preset==="lp"){
+    /* 按 DOM 元素布局切分：每个元素一块，背景带单独处理 */
+    LPDATA.backs.forEach((s,bi)=>{
+      B.push({type:"band",band:bi,x:0,y:s.y*LP.k,w:LP.w,h:s.h*LP.k,bg:s.bg,
+        y0:s.y*LP.k,h0:s.h*LP.k});
+    });
+    LPDATA.elems.forEach((e,ei)=>{
+      const det=!!e.detail;
+      const blk=P({type:"elem",ei,kind:e.kind,detail:det,scene:e.scene||0,
+        x:e.x*LP.k,y:e.y*LP.k,w:e.w*LP.k,h:e.h*LP.k,
+        rad:(e.r||0)*LP.k,
+        crop:{sx:e.x,sy:e.y,sw:e.w,sh:e.h}});
+      blk.label=det?(e.kind==="icon"?"图标":(e.txt||"文字"))
+        :e.kind==="card"?"卡片":e.kind==="ctrl"?"控件"
+        :e.kind==="link"?(e.txt||"链接"):(e.txt||"文案");
+      if(blk.label.length>7)blk.label=blk.label.slice(0,7);
+      if(det){
+        blk.cover=["rgb("+e.bt.join(",")+")","rgb("+e.bb.join(",")+")"];
+        blk.vivid=!!e.vivid;
+      }
+      if(e.kind==="text"||e.kind==="txt"){
+        const hero=!det&&e.y<760;
+        blk.txt={text:hero?"带货主播\n让本色更出色":e.txt,
+          fs:Math.max(11,(e.fs||42)*LP.k*(det?0.92:0.94)), lines:hero?2:1,
+          tx:0,ty:0,tw:blk.w,th:blk.h, cap:hero?1:0,
+          vivid:!!e.vivid, det:det,
+          col:txtColor(e.col||"rgb(240,240,248)"), fw:e.fw||"400",
+          bg:["rgb("+(e.bt||[8,8,14]).join(",")+")","rgb("+(e.bb||[8,8,14]).join(",")+")"]};
+      }
+    });
+    return B;
+  }
+  if(S.preset==="saas"){
+    P({type:"nav",x:0,y:0,w:1260,h:54,drag:0.65});
+    P({type:"text",x:48,y:104,w:560,h:56,role:"h1",text:S.title,fs:46,typing:1.0,drag:0.45});
+    P({type:"img",x:660,y:66,w:576,h:386,role:"hero",drag:0.6});
+    P({type:"text",x:48,y:192,w:470,h:26,role:"sub",text:"一站式发布、协作与增长平台，为团队而生",fs:18,typing:0.8});
+    P({type:"btn",x:48,y:252,w:172,h:50,text:"免费开始",fill:true,drag:0.35});
+    P({type:"btn",x:238,y:252,w:142,h:50,text:"观看演示",fill:false,drag:0.35});
+    P({type:"logos",x:48,y:412,w:540,h:50,drag:0.4});
+    P({type:"card",x:48,y:494,w:384,h:130,icon:0,t1:"极速发布",t2:"一键部署到全球边缘节点"});
+    P({type:"card",x:452,y:494,w:384,h:130,icon:1,t1:"实时协作",t2:"多人同时在线编辑与评论"});
+    P({type:"card",x:856,y:494,w:384,h:130,icon:2,t1:"数据洞察",t2:"实时埋点分析与增长看板"});
+    P({type:"footer",x:0,y:752,w:1260,h:37,drag:0.4});
+  }else if(S.preset==="shop"){
+    P({type:"strip",x:0,y:0,w:1260,h:40,text:"双 11 狂欢 · 全场 5 折起 · 限时 24 小时",drag:0.4});
+    P({type:"img",x:648,y:62,w:588,h:356,role:"product",drag:0.6});
+    P({type:"text",x:48,y:84,w:520,h:52,role:"h1",text:"旗舰新品 焕新登场",fs:44,typing:0.9,drag:0.45});
+    P({type:"stars",x:48,y:168,w:270,h:26,count:5,drag:0.3});
+    P({type:"pill",x:48,y:212,w:200,h:44,text:"¥ 2,999",drag:0.3});
+    P({type:"btn",x:48,y:284,w:200,h:54,text:"立即抢购",fill:true,drag:0.35});
+    P({type:"text",x:48,y:372,w:520,h:24,role:"sub",text:"前 100 名下单赠限量礼盒 · 支持七天无理由",fs:16,typing:0.7});
+    P({type:"card",x:48,y:436,w:520,h:110,icon:3,t1:"顺丰包邮",t2:"全国 300 城次日达"});
+    P({type:"card",x:48,y:566,w:520,h:100,icon:4,t1:"以旧换新",t2:"最高补贴 ¥ 800"});
+    P({type:"thumb",x:648,y:440,w:136,h:136,role:0,drag:0.3});
+    P({type:"thumb",x:804,y:440,w:136,h:136,role:1,drag:0.3});
+    P({type:"thumb",x:960,y:440,w:136,h:136,role:2,drag:0.3});
+    P({type:"countdown",x:648,y:600,w:588,h:88,text:"距结束 23 : 59 : 12",drag:0.4});
+  }else{
+    P({type:"sidebar",x:0,y:0,w:200,h:789,drag:0.6});
+    P({type:"stat",x:232,y:28,w:242,h:104,label:"日活跃用户",num:48231,delta:"+12.4%"});
+    P({type:"stat",x:494,y:28,w:242,h:104,label:"今日收入",num:126504,delta:"+8.1%",money:true});
+    P({type:"stat",x:756,y:28,w:242,h:104,label:"转化率",num:3.82,delta:"+0.6%",unit:"%"});
+    P({type:"stat",x:1018,y:28,w:242,h:104,label:"新增订阅",num:1207,delta:"+23.0%"});
+    P({type:"chart",x:232,y:168,w:1028,h:300,drag:0.65});
+    P({type:"bars",x:232,y:502,w:500,h:240,drag:0.5});
+    P({type:"table",x:756,y:502,w:504,h:240,drag:0.5});
+  }
+  return B;
+}
+const TYPE_LABEL={nav:"导航栏",text:"文案",btn:"按钮",img:"图片",logos:"客户 Logo",card:"卡片",footer:"页脚",strip:"促销条",stars:"评分",pill:"价格",thumb:"缩略图",countdown:"倒计时",sidebar:"侧栏",stat:"指标卡",chart:"图表",bars:"柱状图",table:"表格"};
+
+/* ================= script generation =================
+   每个组件的完整动作链：
+   移动到左上角 → 按下 → 斜拉到右下角(成型) → 松手
+   → 移到中心抓起 → 拖偏微调 → 拉回原位松手 → 离开            */
+function generate(){
+  const blocks=presets();
+  const nCur=Math.max(4,Math.min(S.nCur,24));
+  const cursors=[];
+  /* 每位「操作员」固定的手法参数：倾斜角、光标大小、按键回弹、拖尾、空闲游走、
+     绕场半径/相位、跟队错位。同一 seed 下稳定，点「重新编排」会整体换一套，
+     绝不用逐帧 Math.random（那会变成高频抖动而不是自然的手感差异）。 */
+  for(let i=0;i<nCur;i++){
+    const P=n=>rnd(seed*0.53+i*11.37+n*23.9);
+    cursors.push({name:NAMES[i%NAMES.length],color:CCOLORS[i%CCOLORS.length],i,
+      x:-120-rnd(i*3)*300,y:rnd(i*5)*H,trail:[],
+      _p:{tilt:(P(1)-0.5)*0.26,size:0.93+P(2)*0.15,bounce:0.17+P(3)*0.20,
+          tw:0.10+P(4)*0.10,tline:2.1+P(5)*1.8,
+          jf:0.72+P(6)*1.15,jp:P(7)*6.283,ja:1.5+P(8)*3.6,
+          spin:(P(9)-0.5)*0.10,lag:(P(10)-0.5)*0.11,off:(P(11)-0.5)*13}});
+  }
+  const events=[];
+  let finish=0,used=new Set();
+  /* ---- 仪式时间轴：片头字幕（标题/简介/网址由光标拖出）→ 全员绕圈 → 领队画布局 → 散开搭建 → 收尾绕圈居中 ---- */
+  intro=null;
+  if(isPage()){
+    /* 片头：三只光标并行「写」出网站标题、简介与网址（简介按语义断行，最多两行），
+       全部写完后整卡淡出，光标顺势汇入绕场圆阵。后续所有阶段都相对 tfEnd 推移。 */
+    const M=metaTexts();
+    const tT0=0.55,tT1=tT0+clamp(0.05*Math.max(M.title.length,6),0.8,1.5);
+    const tD0=tT0+0.55,tD1=tD0+clamp(0.032*Math.max(M.desc.length,10),1.0,2.0);
+    const tU0=tD0+0.45,tU1=tU0+clamp(0.055*Math.max(M.url.length,10),0.6,1.3);
+    const tfade=Math.max(tT1,tD1,tU1)+1.1,tfEnd=tfade+0.5,s0=tfEnd+0.08;
+    intro={tl0:0.35,tT0,tT1,tD0,tD1,tU0,tU1,tfade,tfEnd,
+      spin0:s0,spin1:s0+2.08,lay0:s0+2.20,build0:s0+2.20+3.69,h:900,
+      out0:0,outSpin1:0,outEnd:0};
+  }
+  if(isPage()){
+    /* 实拍模式：按元素布局并发搭建 —— 每个元素一只光标，多只光标同时开工 */
+    const bands=blocks.filter(b=>b.type==="band");
+    const elems=blocks.filter(b=>b.type==="elem");
+    // 1. 背景带：1 号光标自上而下把底铺开
+    let tw=intro?intro.build0+0.02:1.0;
+    bands.forEach((b,i)=>{
+      const c=cursors[0];
+      const t0=tw+i*0.15;
+      b._tl=t0;b._t1=t0+0.16;b._tIn=t0+0.16;b._br=t0+0.2;b._fDur=0.16;b._fFill=0.04;
+      b._sk0=t0-0.2;b._end=t0+0.22;
+      events.push({t:t0,c,x:LP.x+18,y:by(b)+b.h*0.5,kind:i?"point":"press",block:b,moveDur:0.16,bandEv:true});
+      events.push({t:t0+0.18,c,x:LP.x+LP.w-18,y:by(b)+b.h*0.5,kind:"point",block:b,moveDur:0.18,straight:true,bandEv:true});
+      finish=Math.max(finish,b._end);
+    });
+    const tBase=tw+bands.length*0.15+0.28;
+    /* 2. 元素按「场景」组织：
+       每个场景先由一波光标搭出结构大块，紧接着多波光标并行把
+       图标 / 图片 / 小文字等细节逐块充实进去。
+       单波 12 只光标，奇偶波使用互不重叠的两组光标 → 同屏最多 24 只同时工作。 */
+    const st=elems.filter(b=>!b.detail), dt=elems.filter(b=>b.detail);
+    const scenes=new Map();
+    [...st,...dt].forEach(b=>{
+      const k=b.scene|0;
+      if(!scenes.has(k))scenes.set(k,{st:[],dt:[]});
+      scenes.get(k)[b.detail?"dt":"st"].push(b);
+    });
+    const MAXC=12;
+    let wt=tBase, waveIdx=0;
+    const schedule=(b,c,t0,short,wi)=>{
+      const small=short||b.w*b.h<9000;
+      /* 每个块 × 每只光标一套确定性微参数：起手速度、落点偏移、工具条位置都略有不同，
+         但事件终点仍精确落在元素框上，不影响标尺投影与像素级对齐。 */
+      const Q=n=>rnd(seed*0.41+b.ei*7.13+n*19.7+wi*3.1+c.i*2.9);
+      const jt=(n,a)=>(Q(n)*2-1)*a;
+      const fD=(short?0.18:(small?0.26:0.34))*(0.92+Q(1)*0.16);
+      const fF=(short?0.13:(small?0.22:0.30))*(0.92+Q(2)*0.16);
+      const t1=t0+fD,tIn=t1+(short?0.04:0.06),t2=tIn+fF;
+      b._cur=c;b._wave=wi;b._tl=t0;b._t1=t1;b._tIn=tIn;b._br=t2;
+      b._fDur=fD;b._fFill=fF;b._sk0=t0-(short?0.3:0.5);
+      // 从左上角按下 → 斜拉到右下角 → 回顶端 → 自上而下刷出内容 → 松手
+      const m=(short?0.16:0.26)*(0.74+Q(3)*0.52);
+      const o1=3+jt(4,2.2),o2=3+jt(5,2.2),o3=6+jt(6,2.6),o4=5+jt(7,2.0);
+      events.push({t:t0,c,x:bx(b)+o1,y:by(b)+o1,kind:"press",block:b,moveDur:m});
+      events.push({t:t1,c,x:bx(b)+b.w-o2,y:by(b)+b.h-o2,kind:"point",block:b,moveDur:fD,straight:true});
+      events.push({t:tIn,c,x:bx(b)+o3,y:by(b)+o4,kind:"point",block:b,moveDur:0.05});
+      events.push({t:t2,c,x:bx(b)+o3,y:by(b)+b.h-o4,kind:"release",block:b,moveDur:fF,straight:true});
+      let tail=t2;
+      // 文字：打字机逐字打入
+      if(b.txt){
+        const nl=(b.txt.text.match(/\n/g)||[]).length;
+        const chars=b.txt.text.length-nl;
+        const tdur=(short?clamp(0.028*chars,0.10,0.34):clamp(0.055*chars,0.22,0.8))*(0.88+Q(8)*0.26);
+        const tT=t2+0.08,tTd=tT+tdur,tx=bx(b)+o3,ty=by(b)+b.h*(0.46+jt(9,0.08));
+        events.push({t:tT,c,x:tx,y:ty,kind:"point",block:b,moveDur:0.14,txtEv:true});
+        events.push({t:tTd,c,x:tx,y:ty,kind:"point",block:b,moveDur:0.03,txtEv:true});
+        b._txt={t0:tT,td:tTd,tg:0,tn:0,tr:0,ts:0,t1:0,t2:0,t3:0,ndx:0,ndy:0,end:tTd};
+        tail=tTd;
+      }
+      // 抓起 → 拖偏微调 → 拉回原位
+      const cxx=bx(b)+b.w/2+jt(10,3),cyy=by(b)+b.h/2+jt(11,3);
+      const ang=rnd(seed+b.ei*13+5)*Math.PI*2,amp=(short?4:(small?5:9))*(0.7+Q(12)*0.7);
+      const ndx=Math.cos(ang)*amp,ndy=Math.sin(ang)*amp*0.55;
+      const dA=short?0.09:(small?0.15:0.19);
+      const tG=tail+(short?0.07:0.12),tN=tG+dA,tR=tN+dA;
+      events.push({t:tG,c,x:cxx,y:cyy,kind:"grab",block:b,moveDur:0.16*(0.8+Q(13)*0.4)});
+      events.push({t:tN,c,x:cxx+ndx,y:cyy+ndy,kind:"nudge",block:b,moveDur:dA,straight:true});
+      events.push({t:tR,c,x:cxx,y:cyy,kind:"ungrab",block:b,moveDur:dA,straight:true});
+      b._adj={t2:tG,t3:tN,t4:tR,dx:ndx,dy:ndy};
+      // 右侧工具条：字号 / 颜色 / 字重（或圆角 / 描边 / 阴影）
+      const dS=(short?0.09:(small?0.15:0.18))*(0.9+Q(14)*0.2);
+      const sX=bx(b)+b.w+(short?22:34)+jt(15,9),sY=by(b)+b.h/2+jt(16,10);
+      const tS=tR+(short?0.08:0.14),tS1=tS+dS,tS2=tS1+dS,tS3=tS2+dS;
+      events.push({t:tS,c,x:sX,y:sY,kind:"point",block:b,moveDur:0.16*(0.8+Q(17)*0.4)});
+      events.push({t:tS1,c,x:sX+jt(18,3),y:sY+jt(19,5),kind:"point",block:b,moveDur:0.03});
+      events.push({t:tS2,c,x:sX+jt(20,3),y:sY+jt(21,5),kind:"point",block:b,moveDur:0.03});
+      events.push({t:tS3+0.1,c,x:sX+34+jt(22,15),y:sY+38+jt(23,15),kind:"leave",moveDur:0.2*(0.8+Q(24)*0.5)});
+      b._sty={t0:tS,t1:tS1,t2:tS2,t3:tS3,end:tS3+(short?0.12:0.2)};
+      b._end=b._sty.end;
+      if(b._txt){b._txt.tg=tG;b._txt.tn=tN;b._txt.tr=tR;b._txt.ndx=ndx;b._txt.ndy=ndy;
+                 b._txt.ts=tS;b._txt.t1=tS1;b._txt.t2=tS2;b._txt.t3=tS3;b._txt.end=b._end;}
+      finish=Math.max(finish,b._end);
+      used.add(c.i);
+    };
+    const keys=[...scenes.keys()].sort((a,b)=>a-b);
+    for(const sc of keys){
+      const g=scenes.get(sc);
+      const S0=g.st.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
+      const D0=g.dt.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
+      let lastSt=wt;
+      for(let i=0;i<S0.length;i+=MAXC){
+        const wi=waveIdx++,ws=wt,chunk=S0.slice(i,i+MAXC);
+        chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
+          ws+bi*0.045+rnd(seed*0.87+wi*13.3+bi*7.7)*0.13,false,wi));
+        wt+=1.34;lastSt=ws;
+      }
+      wt=Math.max(wt,lastSt+(S0.length?1.0:0));
+      for(let i=0;i<D0.length;i+=MAXC){
+        const wi=waveIdx++,ws=wt,chunk=D0.slice(i,i+MAXC);
+        chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
+          ws+bi*0.035+rnd(seed*0.91+wi*17.1+bi*5.9)*0.11,true,wi));
+        wt+=0.9;
+      }
+      wt+=0.16;
+    }
+    // 没分到活的光标：稍后陆续进场待命
+    for(const c of cursors)if(!used.has(c.i)){
+      const t00=6+rnd(seed+c.i*3)*12;
+      for(let k=0;k<2;k++){const bb=elems[Math.floor(rnd(seed+c.i*7+k)*elems.length)];
+        events.push({t:t00+k*2.6+rnd(seed+c.i+k)*0.8,c,
+          x:bx(bb)+bb.w*0.5,y:by(bb)+bb.h*0.5,kind:"point",moveDur:0.8})}
+    }
+  }
+  // ---- 其它模板：并发波次 ----
+  const waves=[];let cur=[];
+  if(!isPage()){
+    blocks.forEach((b,bi)=>{cur.push(b);
+      if(cur.length>=2&&rnd(seed+bi)>0.45||cur.length>=3){waves.push(cur);cur=[]}});
+    if(cur.length)waves.push(cur);
+  }
+  waves.forEach((wave,wi)=>{
+    const base=1.0;
+    const ws=base+wi*1.35;
+    wave.forEach((b,bi)=>{
+      const gi=blocks.indexOf(b);                      // 全局块序号（实拍模式每波只有 1 块）
+      const c=cursors[(wi+bi)%nCur];                   // 每波引入下一只光标 → 光标越来越多
+      const s=ws+bi*0.2;
+      const tlx=bx(b),tly=by(b);                       // 左上角
+      const brx=bx(b)+b.w,bry=by(b)+b.h;               // 右下角
+      const cx2=bx(b)+b.w/2,cy2=by(b)+b.h/2;           // 中心
+      const drag=b.drag||0.5;
+      const tPress=s+(isPage()?0.6:0.5), tRelease=tPress+drag;
+      // 1. 移动到左上角并按下
+      events.push({t:tPress,c,x:tlx,y:tly,kind:"press",block:b,moveDur:0.5});
+      // 2. 按住斜拉到右下角，松手成型
+      events.push({t:tRelease,c,x:brx,y:bry,kind:"release",block:b,moveDur:drag,straight:true});
+      // 3. 位置微调：抓起 → 拖偏 → 拉回 → 松手
+      const ang=rnd(seed+gi*7+3)*Math.PI*2,amp=9+rnd(seed+gi*11+1)*7;
+      const ndx=Math.cos(ang)*amp,ndy=Math.sin(ang)*amp*0.7;
+      const tG=tRelease+0.4,tN=tG+0.32,tR=tN+0.32;
+      events.push({t:tG,c,x:cx2,y:cy2,kind:"grab",block:b,moveDur:0.3});
+      events.push({t:tN,c,x:cx2+ndx,y:cy2+ndy,kind:"nudge",block:b,moveDur:0.32,straight:true});
+      events.push({t:tR,c,x:cx2,y:cy2,kind:"ungrab",block:b,moveDur:0.32,straight:true});
+      b._tl=tPress;b._br=tRelease;b._drag=drag;
+      b._sk0=tPress-1.15;                              // 骨架框开始被描出的时刻
+      b._adj={t2:tG,t3:tN,t4:tR,dx:ndx,dy:ndy};
+      // 4. 文字动作：打字机 → 位置微调 → 样式调整（字号/颜色/字重）
+      let tail=tR;
+      if(b.txt){
+        const tx0=bx(b)+b.txt.tx, ty0=by(b)+b.txt.ty;
+        const cxx=tx0+b.txt.tw/2, cyy=ty0+b.txt.th/2;
+        const nl=(b.txt.text.match(/\n/g)||[]).length;
+        const chars=b.txt.text.length-nl;
+        const tdur=clamp(0.11*chars,0.45,1.1);
+        const tT=tR+0.18, tTd=tT+tdur;
+        // 光标移到文本框起点按下，逐字打入
+        events.push({t:tT,c,x:tx0+8,y:ty0+b.txt.th*0.55,kind:"press",block:b,moveDur:0.5,txtEv:true});
+        events.push({t:tTd,c,x:tx0+8,y:ty0+b.txt.th*0.55,kind:"release",block:b,moveDur:0.05,txtEv:true});
+        // 位置微调：抓起文本框 → 拖偏 → 拉回
+        const ang2=rnd(seed+gi*13+5)*Math.PI*2,amp2=8+rnd(seed+gi*17+3)*8;
+        const ndx2=Math.cos(ang2)*amp2,ndy2=Math.sin(ang2)*amp2*0.6;
+        const tG2=tTd+0.22,tN2=tG2+0.34,tR2=tN2+0.34;
+        events.push({t:tG2,c,x:cxx,y:cyy,kind:"grab",block:b,moveDur:0.28,txtEv:true});
+        events.push({t:tN2,c,x:cxx+ndx2,y:cyy+ndy2,kind:"nudge",block:b,moveDur:0.34,straight:true,txtEv:true});
+        events.push({t:tR2,c,x:cxx,y:cyy,kind:"ungrab",block:b,moveDur:0.34,straight:true,txtEv:true});
+        // 样式调整：光标移到右侧工具条，依次切 字号/颜色/字重
+        const sX=cxx+b.txt.tw/2+72,sY=cyy;
+        const tS=tR2+0.26,tS1=tS+0.42,tS2=tS1+0.42,tS3=tS2+0.42;
+        events.push({t:tS,c,x:sX,y:sY,kind:"point",block:b,moveDur:0.34,txtEv:true});
+        events.push({t:tS1,c,x:sX,y:sY,kind:"point",block:b,moveDur:0.05,txtEv:true});
+        events.push({t:tS2,c,x:sX,y:sY,kind:"point",block:b,moveDur:0.05,txtEv:true});
+        events.push({t:tS3+0.18,c,x:sX+50,y:sY+60,kind:"leave",moveDur:0.32,txtEv:true});
+        b._txt={t0:tT,td:tTd,tg:tG2,tn:tN2,tr:tR2,ts:tS,t1:tS1,t2:tS2,t3:tS3,
+          ndx:ndx2,ndy:ndy2,end:tS3+0.35};
+        tail=b._txt.end;
+      }
+      // 5. 文案打字：成型后光标停留
+      if(b.type==="text"&&b.typing){
+        events.push({t:tR+0.15+b.typing+0.25,c,x:cx2,y:cy2,kind:"leave",moveDur:0.1});
+        tail=Math.max(tail,tR+0.15+b.typing+0.25);
+      }
+      used.add(c.i);
+      finish=Math.max(finish,tail);
+    });
+  });
+  // 空闲光标：在别的光标工作一段时间后陆续进场，随机指向已成型组件
+  for(const c of cursors)if(!isPage()&&!used.has(c.i)&&blocks.length){
+    const t0=4.5+rnd(seed+c.i*3)*9;                    // 错峰进场
+    for(let k=0;k<3;k++){const b=blocks[Math.floor(rnd(seed+c.i*7+k)*blocks.length)];
+      events.push({t:t0+k*2.2+rnd(seed+c.i+k)*0.8,c,x:bx(b)+b.w/2,y:by(b)+b.h/2,kind:"point",moveDur:0.7})}}
+  events.sort((a,b)=>a.t-b.t);
+  if(isPage()&&intro){
+    intro.out0=finish+0.12;intro.outSpin1=finish+1.95;intro.outEnd=finish+2.95;
+    intro.card0=finish+2.0;intro.card1=finish+3.55;
+    intro.review0=finish+3.7;                  // 成品结晶 + 辅助层退场
+    intro.reviewTop=intro.review0+0.85;        // 镜头快速回到页顶
+    intro.review1=intro.reviewTop+9.0;         // 从上到下巡览整页
+  }
+  bindCoverTiming(blocks);
+  if(isPage()&&intro){
+    const es=blocks.filter(b=>b.type==="elem");
+    intro.firstBuild=es.length?Math.min(...es.map(b=>b._tl)):intro.build0;
+  }
+  const duration=isPage()?(intro.review1+0.7):(finish+1.9);
+  script={blocks,cursors,events,duration};
+  evsByCursor=cursors.map(c=>events.filter(e=>e.c===c).sort((a,b)=>a.t-b.t));
+  // 进场时间：仪式模式全员开场即到齐；其它模式按各自首个任务错峰进场
+  for(const c of cursors){
+    const evs=evsByCursor[c.i];
+    if(isPage()){c.join=0.03+c.i*0.018;continue}
+    if(!evs.length){c.join=1e9;continue}
+    c.join=Math.max(0.22,evs[0].t-(evs[0].moveDur||0.6)-0.12);
+  }
+  for(const c of cursors){
+    if(isPage()){c.x=LP.x+LP.w*(0.16+(c.i%6)*0.135);c.y=70+Math.floor(c.i/6)*32}
+    else{c.x=-120-rnd(c.i*3)*300;c.y=rnd(c.i*5)*H}
+  }
+}
+
+/* 细节占位块的出现时机：
+   父结构块画完后，它的整块截图会带出原始文字/图标，此刻才需要盖住；
+   不被任何结构块包含的细节，退回到自身骨架起点。
+   因此开场（父块还没画）不会有任何占位块提前铺开。 */
+function bindCoverTiming(blocks){
+  if(!isPage())return;
+  const st=blocks.filter(b=>b.type==="elem"&&!b.detail);
+  for(const d of blocks){
+    if(d.type!=="elem"||!d.detail)continue;
+    let best=null;
+    for(const s of st){
+      if(d.x>=s.x-2&&d.y>=s.y-2&&d.x+d.w<=s.x+s.w+2&&d.y+d.h<=s.y+s.h+2&&
+         s.w*s.h>d.w*d.h*1.15){
+        if(!best||s.w*s.h<best.w*best.h)best=s;
+      }
+    }
+    d._coverFrom=best?best._br:(d._sk0!==undefined?d._sk0:(d._tl-0.3));
+  }
+}
+
+/* ================= 成品巡览 =================
+   收尾仪式结束后：辅助层全部淡出，画面结晶为真实整页，
+   镜头回到页顶，再从上到下平滑巡览一遍，最终停在页面底部。 */
+function inReview(t){
+  return !!(isPage()&&intro&&intro.review0>0&&t>=intro.review0);
+}
+function pageUiAlpha(t){
+  if(!isPage()||!intro||!intro.review0)return 1;
+  return clamp((intro.review0+0.7-t)/0.7,0,1);   // 1 → 0
+}
+function reviewY(t){
+  const top=H/2,bot=LP.H-H/2;
+  if(t<intro.reviewTop)
+    return lerp(bot,top,easeIO(clamp((t-intro.review0)/(intro.reviewTop-intro.review0),0,1)));
+  const u=clamp((t-intro.reviewTop)/(intro.review1-intro.reviewTop),0,1);
+  return lerp(top,bot,u<0.5?easeIO(u*2)/2:1-easeIO((1-u)*2)/2);
+}
+
+/* ================= theme ================= */
+function theme(){return S.theme==="dark"
+  ?{pageBg:"#181824",chromeBg:"#101018",panel:"#20202e",panel2:"#262636",line:"#32323e",txt:"#f0f0f4",sub:"#9a9aa8",skel:"#22222e",skelLn:"#3a3a4a",desk:"#08080c"}
+  :{pageBg:"#f4f4f7",chromeBg:"#e6e6ec",panel:"#ffffff",panel2:"#eef0f4",line:"#dcdce4",txt:"#1a1a24",sub:"#6a6a7a",skel:"#e7e7ee",skelLn:"#c8c8d4",desk:"#c9c9d4"}}
+
+/* ================= block render (draw + adjust states) ================= */
+/* ================= 文字动作状态机 ================= */
+function hexRGB(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
+function mixColor(a,b,k){const A=hexRGB(a),B=hexRGB(b);
+  return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*k)).join(",")+")"}
+function txtState(b,t){
+  const a=b._txt;if(!a||t<a.t0)return null;
+  const dur=Math.max(a.td-a.t0,0.001);
+  const total=b.txt.text.length;
+  const shown=Math.ceil(total*easeIO(clamp((t-a.t0)/dur,0,1)));
+  let dx=0,dy=0;
+  if(t>=a.tg){
+    const k1=clamp((t-a.tg)/(a.tn-a.tg),0,1),k2=clamp((t-a.tn)/(a.tr-a.tn),0,1);
+    const kk=k1<1?easeIO(k1):1-easeIO(k2);dx=a.ndx*kk;dy=a.ndy*kk;
+  }
+  let fsM=1,cMix=0,wM=0,tool=-1;
+  // 样式结果定格保留；只有工具条在阶段结束后收起
+  if(t>=a.ts){fsM=1+0.12*easeIO(clamp((t-a.ts)/0.32,0,1));if(t<a.end)tool=0}
+  if(t>=a.t1){cMix=easeIO(clamp((t-a.t1)/0.32,0,1));if(t<a.end)tool=1}
+  if(t>=a.t2){wM=easeIO(clamp((t-a.t2)/0.32,0,1));if(t<a.end)tool=2}
+  return {shown,dx,dy,fsM,cMix,wM,tool,typing:t<a.td};
+}
+/* 素材样式调整状态（圆角 → 描边 → 阴影） */
+function styState(b,t){
+  const s=b._sty;if(!s||t<s.t0)return null;
+  return {k1:easeIO(clamp((t-s.t0)/0.28,0,1)),
+          k2:easeIO(clamp((t-s.t1)/0.28,0,1)),
+          k3:easeIO(clamp((t-s.t2)/0.28,0,1)),
+          tool:t>=s.end?-1:(t>=s.t2?2:(t>=s.t1?1:0))};
+}
+function adjustOf(b,t){
+  const a=b._adj;if(!a)return null;
+  if(t<a.t2||t>a.t4)return null;
+  const k1=clamp((t-a.t2)/(a.t3-a.t2),0,1),k2=clamp((t-a.t3)/(a.t4-a.t3),0,1);
+  const k=k1<1?easeIO(k1):1-easeIO(k2);
+  return {dx:a.dx*k,dy:a.dy*k,lift:true};
+}
+/* 框与素材共用同一个矩形：微调（拖动）时标尺投影、中心辅助线必须跟着一起走 */
+function frameRect(b,t){
+  const a=adjustOf(b,t);
+  return {x:bx(b)+(a?a.dx:0),y:by(b)+(a?a.dy:0),w:b.w,h:b.h};
+}
+/* 细节元素未搭建时的占位：保留原图纹理但压暗，形成统一的「待填充图层」 */
+function drawDetailCover(b,x,y,opaque,alpha){
+  if(!b.detail)return;
+  const A=alpha===undefined?1:clamp(alpha,0,1);
+  if(A<=0)return;
+  const rad=Math.min(b.rad||2,10);
+  ctx.save();
+  ctx.globalAlpha=A;
+  rr(ctx,x,y,b.w,b.h,rad);ctx.clip();
+  if(LPIMG.complete&&LPIMG.naturalWidth){
+    drawCrop(x,y,b.w,b.h);
+  }else{ctx.fillStyle="#101018";ctx.fillRect(x,y,b.w,b.h)}
+  /* opaque：文字图层用纯色盖住原站字形，彻底消除重影 */
+  ctx.fillStyle=opaque?"#08090f":"rgba(8,9,16,.96)";ctx.fillRect(x,y,b.w,b.h);
+  ctx.restore();
+  ctx.save();ctx.globalAlpha=A;ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
+  rr(ctx,x+.5,y+.5,b.w-1,b.h-1,rad);ctx.stroke();ctx.restore();
+}
+/* 黑色层槽：素材所在的「图层井」，下方透出堆叠的图层边，表现 z 深度 */
+function drawLayerWell(x,y,w,h,rad,z){
+  ctx.save();
+  if(z>0&&h>8){
+    for(let i=3;i>=1;i--){
+      const off=i*2.3;
+      ctx.fillStyle="rgba(12,14,26,"+(0.42+i*0.13).toFixed(2)+")";
+      rr(ctx,x+off*0.5,y+off,w-off,h,Math.min(rad,6));ctx.fill();
+      ctx.strokeStyle="rgba(146,160,214,"+(0.10+i*0.055).toFixed(2)+")";
+      ctx.lineWidth=1;rr(ctx,x+off*0.5+.5,y+off+.5,w-off-1,h-1,Math.min(rad,6));ctx.stroke();
+    }
+  }
+  ctx.fillStyle="#05060c";rr(ctx,x,y,w,h,rad);ctx.fill();
+  const g=ctx.createLinearGradient(0,y,0,y+Math.min(h,26));
+  g.addColorStop(0,"rgba(0,0,0,.88)");g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=g;rr(ctx,x,y,w,Math.min(h,26),rad);ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.13)";ctx.lineWidth=1;
+  rr(ctx,x+.5,y+.5,w-1,h-1,rad);ctx.stroke();
+  ctx.restore();
+}
+/* 槽口前沿：压在素材之上的黑边，素材像从这道边后面被推上来（内容之后绘制） */
+function drawLayerLip(x,y,w,h,drop){
+  if(drop<0.4)return;
+  ctx.save();
+  ctx.globalAlpha=clamp(drop/6,0,1);
+  ctx.fillStyle="rgba(0,0,0,.92)";ctx.fillRect(x,y+h-2.5,w,2.5);
+  ctx.fillStyle="rgba(255,255,255,.16)";ctx.fillRect(x,y+h-2.5,w,1);
+  ctx.restore();
+}
+/* 图层序号小标签：告诉观众这一块处在第几层、正在上升多少 */
+function drawLayerChip(x,y,z,drop,AC){
+  const lab="L"+String(z).padStart(2,"0")+"  z"+z+(drop>0.5?("  ↑"+Math.round(drop)+"px"):"  SET");
+  ctx.save();
+  ctx.font="600 9px 'JetBrains Mono',monospace";
+  const cw=ctx.measureText(lab).width+12, cy=y-13;
+  ctx.fillStyle="rgba(6,8,16,.92)";rr(ctx,x,cy-8,cw,15,4);ctx.fill();
+  ctx.strokeStyle=AC;ctx.lineWidth=1;rr(ctx,x+.5,cy-7.5,cw-1,14,4);ctx.stroke();
+  ctx.fillStyle="#e8ecff";ctx.textAlign="left";ctx.textBaseline="middle";
+  ctx.fillText(lab,x+6,cy-.5);
+  ctx.restore();
+}
+function drawBlock(b,t,th){
+  const x=bx(b),y=by(b),AC=S.accent;
+  // 背景带：光标横向刷开纯色底
+  if(b.type==="band"){
+    if(t<b._tl)return;
+    const bp=easeOut(clamp((t-b._tl)/Math.max(b._br-b._tl,0.05),0,1));
+    ctx.fillStyle=b.bg;ctx.fillRect(x,y,b.w*bp,b.h);
+    return;
+  }
+  /* 占位块跟随「包含它的父结构块画完」或自身骨架起点，并淡入。
+     不能用全局 intro.build0 做闸门：那样背景带刚铺开、任务还没开始，
+     229 个细节占位就会一次性铺满整页。 */
+  if(b.detail&&t<b._br&&isPage()){
+    const s0=b._coverFrom!==undefined?b._coverFrom:
+             (b._sk0!==undefined?b._sk0:(b._tl-0.3));
+    if(t>=s0)drawDetailCover(b,x,y,false,clamp((t-s0)/0.22,0,1));
+  }
+  const adj=adjustOf(b,t);
+  const drawing=t>=b._tl&&t<b._br;
+  const placed=t>=b._br;
+  // ---- 骨架阶段：框由一个光标一点点描出来，虚线流动表示笔正在画 ----
+  if(t<b._tl){
+    if(!S.skel)return;
+    const sk0=b._sk0!==undefined?b._sk0:b._tl-1.15;
+    if(t<sk0)return;
+    const ik=easeIO(clamp((t-sk0)/Math.max(b._tl-sk0,0.2),0,1));
+    ctx.save();
+    ctx.beginPath();ctx.rect(x,y,Math.max(b.w*ik,2),Math.max(b.h*ik,2));ctx.clip();
+    /* 层框先以纯黑凹槽出现：素材稍后从这个黑框底下升上来 */
+    ctx.fillStyle="#05060c";rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
+    ctx.globalAlpha=0.4+0.2*Math.sin(t*4+b.x);
+    ctx.fillStyle=th.skel;rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
+    ctx.globalAlpha=0.9;
+    ctx.strokeStyle=th.skelLn;ctx.lineWidth=1.3;ctx.setLineDash([7,6]);
+    ctx.lineDashOffset=-t*46;
+    rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.stroke();
+    ctx.setLineDash([]);ctx.lineDashOffset=0;
+    ctx.globalAlpha=0.45+0.3*ik;
+    ctx.fillStyle=th.skelLn;ctx.font="500 13px Inter,'PingFang SC',sans-serif";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(b.label||TYPE_LABEL[b.type]||b.type,x+b.w/2,y+b.h/2);
+    ctx.restore();return;
+  }
+  ctx.save();
+  // 微调位移与抓起抬升。实拍模式禁用一切缩放：
+  // 任何 3%~5% 的缩放都会让素材与标尺投影 / 中心辅助线错开几个像素。
+  if(adj){
+    ctx.translate(adj.dx,adj.dy);
+    if(!isPage()){
+      const cx2=x+b.w/2,cy2=y+b.h/2;
+      ctx.translate(cx2,cy2);ctx.scale(1.03,1.03);ctx.translate(-cx2,-cy2);
+      ctx.shadowColor="rgba(0,0,0,.5)";ctx.shadowBlur=30;ctx.shadowOffsetY=10;
+    }
+  }else if(placed&&!isPage()){
+    ctx.shadowColor="rgba(0,0,0,.3)";ctx.shadowBlur=14;ctx.shadowOffsetY=4;
+  }
+  if(placed&&!adj&&!isPage()){
+    const p=(t-b._br)/0.3;
+    if(p<1){const sc=1.05-0.05*easeOut(clamp(p,0,1));
+      const cx2=x+b.w/2,cy2=y+b.h/2;ctx.translate(cx2,cy2);ctx.scale(sc,sc);ctx.translate(-cx2,-cy2)}
+  }
+  // ---- 绘制中：先开黑色层槽 → 素材从槽底升上来 → 自上而下刷入（整块一次画完）----
+  if(drawing){
+    const fD=b._fDur||0.7;
+    const t1=b._t1!==undefined?b._t1:b._tl+fD;
+    const tIn=b._tIn!==undefined?b._tIn:t1;
+    const fF=b._fFill||0.8;
+    const pf=easeIO(clamp((t-b._tl)/fD,0,1));           // 描框进度（对角）
+    const pg=easeIO(clamp((t-tIn)/fF,0,1));             // 填充进度（自上而下）
+    const z=layerZ(b), rad=b.rad||2;
+    /* 行程随素材高度走：大卡片有明显的一段「从槽底推上来」，小图标保持轻巧 */
+    const depth=Math.min(46,Math.max(9,b.h*0.10)+z*1.2);
+    /* 升起与「内容开始刷出」同起同止：_br 时 drop 精确为 0，落位不跳一像素 */
+    const rise=easeOut(clamp((t-tIn)/Math.max(fF,0.06),0,1));
+    const drop=depth*(1-rise);
+    // ① 黑色层槽 + 下方堆叠的图层边
+    drawLayerWell(x,y,b.w,b.h,rad,z);
+    // 目标虚线框
+    ctx.strokeStyle=th.skelLn;ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    rr(ctx,x,y,b.w,b.h,rad);ctx.stroke();ctx.setLineDash([]);
+    // ② 素材：被限制在槽内，从底边以下向上浮出
+    if(pg>0){
+      ctx.save();
+      ctx.beginPath();ctx.rect(x,y,b.w,Math.max(b.h*pg,1));ctx.clip();
+      ctx.save();
+      ctx.beginPath();ctx.rect(x,y,b.w,b.h);ctx.clip();
+      ctx.translate(0,drop);
+      if(b.kind!=="text"&&b.kind!=="txt"){
+        if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;ctx.fillRect(x,y,b.w,b.h)}
+      }else{
+        ctx.fillStyle="#08090f";ctx.fillRect(x,y,b.w,b.h);
+      }
+      ctx.restore();
+      ctx.restore();
+      /* 图层薄片轮廓：即使素材本身是深色，也能看清「一张层」正在被推上来。
+         透明度随 drop 衰减，落位时完全消失，不留下任何像素偏移。 */
+      if(drop>0.4){
+        const my=y+drop,k=clamp(drop/depth,0,1);
+        ctx.save();
+        ctx.beginPath();ctx.rect(x,y,b.w,b.h);ctx.clip();
+        ctx.strokeStyle="rgba(150,196,255,"+(0.78*k).toFixed(3)+")";
+        ctx.lineWidth=1.2;
+        ctx.strokeRect(x+.6,my+.6,b.w-1.2,Math.max(b.h-1.2,1));
+        // 四角控制点：设计软件里「选中图层」的语汇
+        ctx.fillStyle="rgba(206,233,255,"+(0.95*k).toFixed(3)+")";
+        const s=4;
+        [[x,my],[x+b.w,my],[x,my+b.h],[x+b.w,my+b.h]].forEach(p=>
+          ctx.fillRect(p[0]-s/2,p[1]-s/2,s,s));
+        ctx.restore();
+      }
+      // 升起中的素材整体泛冷光，落位时完全退去（终点不残留，像素级归位）
+      if(drop>0.4){
+        ctx.save();
+        ctx.beginPath();ctx.rect(x,y+drop,b.w,Math.max(b.h-drop,1));ctx.clip();
+        ctx.globalAlpha=clamp(drop/depth,0,1)*0.30;
+        const lg=ctx.createLinearGradient(0,y+drop,0,y+drop+Math.min(b.h,180));
+        lg.addColorStop(0,AC);lg.addColorStop(0.4,"rgba(90,173,255,.30)");
+        lg.addColorStop(1,"rgba(90,173,255,0)");
+        ctx.fillStyle=lg;ctx.fillRect(x,y+drop,b.w,Math.max(Math.min(b.h-drop,180),1));
+        ctx.restore();
+      }
+      // 升起中的素材顶边：蓝色高光 + 辉光，明确「这一层正在浮上来」
+      if(drop>0.4&&pg>0){
+        const ey=y+drop;
+        ctx.save();
+        const gg=ctx.createLinearGradient(0,ey-18,0,ey+3);
+        gg.addColorStop(0,"rgba(0,0,0,0)");gg.addColorStop(1,"rgba(90,173,255,.30)");
+        ctx.fillStyle=gg;ctx.fillRect(x,ey-18,b.w,18);
+        ctx.shadowColor="rgba(90,173,255,.9)";ctx.shadowBlur=10;
+        ctx.fillStyle="#7cc0ff";ctx.fillRect(x,ey-1.2,b.w,2.4);
+        ctx.shadowBlur=0;ctx.fillStyle="#cfe9ff";
+        ctx.fillRect(x,ey-1.2,Math.min(18,b.w),2.4);
+        ctx.fillRect(x+b.w-Math.min(18,b.w),ey-1.2,Math.min(18,b.w),2.4);
+        ctx.restore();
+      }
+      // 刷头亮线：正在被刷出的分界
+      if(pg<1){
+        const ey=y+b.h*pg;
+        const g2=ctx.createLinearGradient(0,ey-26,0,ey+2);
+        g2.addColorStop(0,"rgba(0,0,0,0)");g2.addColorStop(1,AC+"55");
+        ctx.fillStyle=g2;ctx.fillRect(x,ey-26,b.w,26);
+        ctx.fillStyle=AC;ctx.fillRect(x,ey-1.2,b.w,1.6);
+      }
+    }
+    drawLayerLip(x,y,b.w,b.h,drop);
+    // 外框：描框阶段沿对角露出 = 框正被一笔笔描出来
+    ctx.save();
+    ctx.beginPath();ctx.rect(x-3,y-3,(b.w+6)*pf,(b.h+6)*pf);ctx.clip();
+    ctx.strokeStyle=AC;ctx.lineWidth=Math.min(2.2,Math.max(1.2,Math.min(b.w,b.h)*0.05+1));
+    rr(ctx,x,y,b.w,b.h,rad);ctx.stroke();
+    ctx.restore();
+    // ③ 图层序号 / 上升深度
+    if(b.w>72)drawLayerChip(x,y,z,drop,AC);
+    ctx.restore();return;
+  }
+  ctx.globalAlpha=clamp((t-b._br)/0.25,0,1);
+  if(isPage()){
+    // 落位的一瞬：层阴影收拢，表示素材已经浮到自己的 z 层并卡紧
+    const settle=clamp((t-b._br)/0.5,0,1);
+    if(settle<1){
+      ctx.save();
+      ctx.fillStyle="rgba(0,0,0,"+(0.42*(1-settle)).toFixed(3)+")";
+      rr(ctx,x+3,y+4+8*(1-settle),b.w,b.h,b.rad||2);ctx.fill();
+      ctx.restore();
+    }
+    // 微调（拖动）时框跟着素材一起走，四角控制点表明这是整层在移动
+    if(adj){
+      ctx.save();ctx.strokeStyle=AC;ctx.lineWidth=1.3;ctx.globalAlpha=.9;
+      rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.stroke();
+      ctx.fillStyle=AC;
+      [[x,y],[x+b.w,y],[x,y+b.h],[x+b.w,y+b.h]].forEach(p=>ctx.fillRect(p[0]-2,p[1]-2,4,4));
+      ctx.restore();
+    }
+  }
+  if(b.type==="elem"){
+    const st=styState(b,t);
+    const stm=b.txt?null:st;             // 文字元素：样式变化落在文字上
+    const rad=(b.rad||2)+(stm?stm.k1*6:0);
+    if(stm&&stm.k3>0&&!b.detail){
+      ctx.save();
+      ctx.shadowColor="rgba(0,0,0,"+(0.28+0.3*stm.k3).toFixed(3)+")";
+      ctx.shadowBlur=12+16*stm.k3;ctx.shadowOffsetY=3+5*stm.k3;
+      ctx.fillStyle=th.pageBg;rr(ctx,x,y,b.w,b.h,rad);ctx.fill();
+      ctx.restore();
+    }
+    if(b.kind!=="text"&&b.kind!=="txt"){
+      if(isPage()){
+        /* 不再用圆角裁剪：矩形对矩形才是与整页成品图完全一致的映射 */
+        if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;rr(ctx,x,y,b.w,b.h,rad);ctx.fill()}
+      }else if(b.crop&&LPIMG.complete&&LPIMG.naturalWidth){
+        ctx.save();rr(ctx,x,y,b.w,b.h,rad);ctx.clip();
+        ctx.drawImage(LPIMG,b.crop.sx,b.crop.sy,b.crop.sw,b.crop.sh,x,y,b.w,b.h);
+        ctx.restore();
+      }else{
+        ctx.fillStyle=th.skel;rr(ctx,x,y,b.w,b.h,rad);ctx.fill();
+      }
+    }
+    if(stm&&stm.k2>0){
+      ctx.save();ctx.globalAlpha=stm.k2;ctx.strokeStyle=AC;ctx.lineWidth=2.2;
+      rr(ctx,x,y,b.w,b.h,rad);ctx.stroke();ctx.restore();
+    }
+    drawTextLayer(b,t,x,y,AC,st);
+    ctx.restore();return;
+  }
+  drawBlockBody(b,t,th,x,y,AC);
+  ctx.restore();
+}
+/* 实拍模式文字图层：遮盖/胶囊底 + 打字机 + 微调位移 + 样式工具条 */
+function drawTextLayer(b,t,x,y,AC,st){
+  const ts=b.txt?txtState(b,t):null;
+  if(!ts){
+    // 没有标题文字的素材：仍然要有「调样式」这一步（圆角/描边/阴影）
+    if(st&&st.tool>=0){
+      const sx=x+b.w-(b.detail?26:62),sy=y+(b.h>300?44:b.h/2);
+      if(b.detail){ctx.save();ctx.translate(sx,sy);ctx.scale(.6,.6);ctx.translate(-sx,-sy);
+        drawStyleBar(sx,sy,AC,st.tool,"mat");ctx.restore()}
+      else drawStyleBar(sx,sy,AC,st.tool,"mat");
+    }
+    return;
+  }
+  const cap=b.txt.cap, det=!!b.txt.det, page=isPage();
+  /* 实拍模式：文字底框严格等于元素框，不向四周多出 1px，杜绝「字与框错开」 */
+  const pad=page?0:(det?0:(cap?10:9)),padY=page?0:(det?0:(cap?9:6));
+  const gx=x+b.txt.tx-pad+ts.dx, gy=y+b.txt.ty-padY+ts.dy;
+  const gw=b.txt.tw+pad*2+(page?0:(cap?26:0)), gh=b.txt.th+padY*2;
+  const crad=page?(b.rad||2):(det?Math.min(b.rad||2,6):7);
+  ctx.save();
+  if(page){ctx.beginPath();ctx.rect(x,y,b.w,b.h);ctx.clip()}
+  // 底：细节文字用纯色图层（盖住原站字形，消除重影），结构标题用胶囊 / 采样渐变
+  if(det){
+    drawDetailCover(b,x,y,true);
+    ctx.beginPath();ctx.rect(gx,gy,gw,gh);ctx.clip();
+  }else if(cap){
+    ctx.fillStyle=page?"#0a0c16":"rgba(10,12,22,.94)";rr(ctx,gx,gy,gw,gh,page?crad:16);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;rr(ctx,gx,gy,gw,gh,page?crad:16);ctx.stroke();
+  }else{
+    const g=ctx.createLinearGradient(0,gy,0,gy+gh);
+    g.addColorStop(0,b.txt.bg[0]);g.addColorStop(1,b.txt.bg[1]);
+    ctx.fillStyle=g;rr(ctx,gx,gy,gw,gh,crad);ctx.fill();
+  }
+  // 打字文字
+  const lines=b.txt.text.split("\n");
+  const lh=b.txt.th/b.txt.lines;
+  let remaining=ts.shown;
+  const vivid=!!b.txt.vivid;
+  const base=det?(vivid?"#ffffff":(b.txt.col||"#f0f0f4")):"#ffffff";
+  const col=(!vivid&&ts.cMix>0)?mixColor(base,AC,ts.cMix*(det?0.5:1)):base;
+  const fw=det?((parseInt(b.txt.fw,10)||400)>=600?"800":"500"):"800";
+  if(vivid&&ts.cMix>0){ctx.shadowColor=AC;ctx.shadowBlur=(det?10:22)*ts.cMix}
+  ctx.fillStyle=col;ctx.textAlign="left";ctx.textBaseline="middle";
+  lines.forEach((ln,i)=>{
+    const take=Math.min(ln.length,remaining);remaining-=take;
+    const str=ln.slice(0,take);
+    const fs2=b.txt.fs*ts.fsM;
+    ctx.font=fw+" "+fs2.toFixed(1)+"px Inter,'PingFang SC',sans-serif";
+    const cxl=gx+pad,cyl=gy+padY+lh*(i+0.5);
+    if(ts.wM>0){ctx.save();ctx.lineWidth=ts.wM*1.8;ctx.strokeStyle=col;ctx.strokeText(str,cxl,cyl);ctx.restore()}
+    ctx.fillText(str,cxl,cyl);
+    // 打字插入符（闪烁）
+    if(ts.typing&&take>0&&take<ln.length){
+      const cw=ctx.measureText(str).width;
+      if(Math.sin(t*14)>-0.2){
+        ctx.fillStyle=S.accent;ctx.fillRect(cxl+cw+4,cyl-fs2*0.42,3,fs2*0.84);ctx.fillStyle=col;
+      }
+    }
+  });
+  ctx.restore();
+  // 样式工具条：文字素材=字号/颜色/字重，图片素材=圆角/描边/阴影
+  const sx2=x+b.w-62, sy2=y+(b.h>300?44:b.h/2);
+  if(ts.tool>=0){
+    if(det){ctx.save();ctx.translate(sx2,sy2);ctx.scale(.6,.6);ctx.translate(-sx2,-sy2);
+      drawStyleBar(sx2,sy2,AC,ts.tool,"txt");ctx.restore()}
+    else drawStyleBar(sx2,sy2,AC,ts.tool,"txt");
+  }
+}
+/* 素材/文字共用的三键样式工具条 */
+function drawStyleBar(cx,cy,AC,tool,kind){
+  const tbW=132,tbH=46,tbx=cx-tbW/2,tby=cy-tbH/2;
+  ctx.save();
+  ctx.shadowColor="rgba(0,0,0,.5)";ctx.shadowBlur=18;ctx.shadowOffsetY=6;
+  ctx.fillStyle="rgba(20,20,30,.95)";rr(ctx,tbx,tby,tbW,tbH,12);ctx.fill();
+  ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+  ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=1;rr(ctx,tbx,tby,tbW,tbH,12);ctx.stroke();
+  const items=kind==="txt"?["A⁺","●","B"]:["⌀","▢","✦"];
+  items.forEach((s,i)=>{
+    const bx2=tbx+10+i*38,by2=tby+9,bw2=34,bh2=28;
+    const on=tool===i;
+    if(on){ctx.fillStyle=AC;rr(ctx,bx2,by2,bw2,bh2,8);ctx.fill()}
+    else{ctx.fillStyle="rgba(255,255,255,.08)";rr(ctx,bx2,by2,bw2,bh2,8);ctx.fill()}
+    ctx.fillStyle=on?"#fff":"#9a9aa8";
+    ctx.font="700 14px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(s,bx2+bw2/2,by2+bh2/2+1);
+  });
+  ctx.restore();
+}
+function drawBlockBody(b,t,th,x,y,AC){
+  switch(b.type){
+    case "nav":{
+      ctx.fillStyle=th.panel;ctx.fillRect(x,y,b.w,b.h);
+      ctx.fillStyle=AC;ctx.beginPath();ctx.arc(x+30,y+b.h/2,8,0,7);ctx.fill();
+      ctx.fillStyle=th.txt;ctx.font="700 15px Inter,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText("Acme",x+46,y+b.h/2);
+      ctx.fillStyle=th.sub;
+      for(let i=0;i<4;i++){rr(ctx,x+480+i*96,y+b.h/2-4,56,8,4);ctx.fill()}
+      ctx.fillStyle=AC;rr(ctx,x+b.w-160,y+11,124,b.h-22,8);ctx.fill();
+      ctx.fillStyle="#fff";ctx.font="600 12px Inter,'PingFang SC',sans-serif";ctx.textAlign="center";
+      ctx.fillText("控制台",x+b.w-98,y+b.h/2);
+      break}
+    case "strip":{
+      ctx.fillStyle=AC;ctx.fillRect(x,y,b.w,b.h);
+      ctx.fillStyle="#fff";ctx.font="600 15px Inter,'PingFang SC',sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(b.text,x+b.w/2,y+b.h/2);
+      break}
+    case "text":{
+      const isH=b.role==="h1";
+      let txt=b.text||"";
+      if(b.typing){const tp=clamp((t-b._br-0.15)/b.typing,0,1);txt=txt.slice(0,Math.ceil(txt.length*easeIO(tp)))}
+      ctx.fillStyle=isH?th.txt:th.sub;
+      ctx.font=(isH?"700 ":"500 ")+b.fs+"px Inter,'PingFang SC',sans-serif";
+      ctx.textAlign="left";ctx.textBaseline="alphabetic";
+      ctx.fillText(txt,x,y+b.h*0.8);
+      if(b.typing){const tp=clamp((t-b._br-0.15)/b.typing,0,1);
+        if(tp>0&&tp<1){const w2=ctx.measureText(txt).width;
+          ctx.fillStyle=AC;ctx.fillRect(x+w2+3,y+b.h*0.15,3,b.h*0.7)}}
+      break}
+    case "btn":{
+      if(b.fill){ctx.fillStyle=AC;rr(ctx,x,y,b.w,b.h,12);ctx.fill();
+        ctx.fillStyle="#fff"}
+      else{ctx.strokeStyle=th.line;ctx.lineWidth=1.5;rr(ctx,x,y,b.w,b.h,12);ctx.stroke();ctx.fillStyle=th.txt}
+      ctx.font="600 16px Inter,'PingFang SC',sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(b.text,x+b.w/2,y+b.h/2);
+      break}
+    case "img":{
+      const g=ctx.createLinearGradient(x,y,x+b.w,y+b.h);
+      g.addColorStop(0,shiftColor(S.accent,-30));g.addColorStop(0.55,S.accent);g.addColorStop(1,shiftColor(S.accent,70));
+      ctx.fillStyle=g;rr(ctx,x,y,b.w,b.h,16);ctx.fill();
+      ctx.fillStyle="rgba(0,0,0,.28)";rr(ctx,x+b.w*0.09,y+b.h*0.14,b.w*0.82,b.h*0.72,12);ctx.fill();
+      ctx.fillStyle="rgba(255,255,255,.16)";rr(ctx,x+b.w*0.12,y+b.h*0.2,b.w*0.16,b.h*0.6,8);ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=3;ctx.lineJoin="round";ctx.beginPath();
+      const px=x+b.w*0.34,py=y+b.h*0.62,pw=b.w*0.52,ph2=b.h*0.5;
+      for(let i=0;i<=24;i++){const u=i/24;
+        const vx=px+u*pw,vy=py-ph2*(0.25+0.6*Math.sin(u*5+1))*(0.4+0.6*u);
+        i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy)}
+      ctx.stroke();
+      ctx.fillStyle="rgba(255,255,255,.92)";ctx.beginPath();ctx.arc(x+b.w/2,y+b.h/2,38,0,7);ctx.fill();
+      ctx.fillStyle=S.accent;ctx.beginPath();
+      ctx.moveTo(x+b.w/2-10,y+b.h/2-15);ctx.lineTo(x+b.w/2+16,y+b.h/2);ctx.lineTo(x+b.w/2-10,y+b.h/2+15);ctx.closePath();ctx.fill();
+      break}
+    case "logos":{
+      ctx.fillStyle=th.sub;ctx.font="600 14px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ["◆ Vektor","● Nimbus","▲ Orbix","■ Quadra","✦ Pulse"].forEach((s,i)=>ctx.fillText(s,x+52+i*(b.w-70)/4,y+b.h/2));
+      break}
+    case "card":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,14);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,14);ctx.stroke();
+      const cols=[AC,"#f0a429","#22c07d","#29a8e0","#e24b8d"];
+      ctx.fillStyle=cols[b.icon%5];rr(ctx,x+24,y+28,42,42,11);ctx.fill();
+      ctx.fillStyle="#fff";ctx.font="700 17px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(String.fromCharCode(65+b.icon),x+45,y+50);
+      ctx.fillStyle=th.txt;ctx.font="600 18px Inter,'PingFang SC',sans-serif";ctx.textAlign="left";
+      ctx.fillText(b.t1,x+84,y+42);
+      ctx.fillStyle=th.sub;ctx.font="400 14px Inter,'PingFang SC',sans-serif";
+      ctx.fillText(b.t2,x+84,y+72);
+      break}
+    case "footer":{
+      ctx.fillStyle=th.panel;ctx.fillRect(x,y,b.w,b.h);
+      ctx.fillStyle=th.sub;ctx.font="400 12.5px Inter,'PingFang SC',sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText("© 2026 Acme Inc. · 隐私政策 · 服务条款",x+26,y+b.h/2);
+      ctx.textAlign="right";ctx.fillText("Social · GitHub · WeChat",x+b.w-26,y+b.h/2);
+      break}
+    case "stars":{
+      ctx.fillStyle="#f0a429";
+      for(let i=0;i<b.count;i++)star(x+16+i*34,y+b.h/2,12);
+      ctx.fillStyle=th.sub;ctx.font="500 14px Inter,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText("4.9 · 2,384 条评价",x+b.count*34+18,y+b.h/2);
+      break}
+    case "pill":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,11);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,11);ctx.stroke();
+      ctx.fillStyle=AC;ctx.font="700 27px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(b.text,x+b.w/2,y+b.h/2);
+      break}
+    case "thumb":{
+      const g=ctx.createLinearGradient(x,y,x+b.w,y+b.h);
+      g.addColorStop(0,shiftColor(S.accent,b.role*40));g.addColorStop(1,shiftColor(S.accent,90+b.role*40));
+      ctx.fillStyle=g;rr(ctx,x,y,b.w,b.h,11);ctx.fill();
+      if(b.role===0){ctx.strokeStyle=AC;ctx.lineWidth=3;rr(ctx,x,y,b.w,b.h,11);ctx.stroke()}
+      break}
+    case "countdown":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,13);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,13);ctx.stroke();
+      ctx.fillStyle=th.txt;ctx.font="700 27px ui-monospace,Consolas,monospace";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(b.text,x+b.w/2,y+b.h/2);
+      break}
+    case "sidebar":{
+      ctx.fillStyle=S.theme==="dark"?"#14141d":"#1c1c28";ctx.fillRect(x,y,b.w,b.h);
+      ctx.fillStyle=AC;ctx.beginPath();ctx.arc(x+30,y+32,9,0,7);ctx.fill();
+      ctx.fillStyle="#fff";ctx.font="700 14px Inter,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText("Acme",x+48,y+33);
+      ctx.fillStyle="rgba(255,255,255,.26)";
+      for(let i=0;i<7;i++)rr(ctx,x+22,y+82+i*46,140,11,5),ctx.fill();
+      ctx.fillStyle=AC;rr(ctx,x+22,y+82,140,11,5);ctx.fill();
+      break}
+    case "stat":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,13);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,13);ctx.stroke();
+      ctx.fillStyle=th.sub;ctx.font="500 13px Inter,'PingFang SC',sans-serif";ctx.textAlign="left";ctx.textBaseline="alphabetic";
+      ctx.fillText(b.label,x+20,y+30);
+      const prog2=clamp((t-b._br-0.5)/0.9,0,1);
+      const val=b.num<10?(b.num*easeOut(prog2)).toFixed(2):Math.round(b.num*easeOut(prog2)).toLocaleString();
+      ctx.fillStyle=th.txt;ctx.font="700 30px ui-monospace,Consolas,monospace";
+      ctx.fillText((b.money?"¥ ":"")+val+(b.unit||""),x+20,y+72);
+      ctx.fillStyle="#22c07d";ctx.font="600 14px Inter,sans-serif";
+      ctx.fillText("↑ "+b.delta,x+20,y+93);
+      break}
+    case "chart":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,13);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,13);ctx.stroke();
+      const px=x+36,py=y+36,pw=b.w-72,ph2=b.h-62;
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){ctx.beginPath();ctx.moveTo(px,py+ph2*i/4);ctx.lineTo(px+pw,py+ph2*i/4);ctx.stroke()}
+      const prog2=clamp((t-b._br-0.5)/1.5,0,1),N2=36,pts=[];
+      for(let i=0;i<=N2;i++){const u=i/N2;
+        pts.push([px+u*pw,py+ph2*(0.85-0.55*(0.5+0.5*Math.sin(u*9+seed))*easeOut(u)-0.12*Math.sin(u*23+seed*2))])}
+      const lim=Math.floor(pts.length*easeIO(prog2));
+      if(lim>1){
+        ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+        for(let i=1;i<lim;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+        ctx.strokeStyle=AC;ctx.lineWidth=3.5;ctx.lineJoin="round";ctx.stroke();
+        ctx.lineTo(pts[lim-1][0],py+ph2);ctx.lineTo(pts[0][0],py+ph2);ctx.closePath();
+        ctx.globalAlpha=(ctx.globalAlpha||1)*0.15;ctx.fillStyle=AC;ctx.fill();ctx.globalAlpha/=0.15;
+        const lp=pts[lim-1];
+        ctx.fillStyle=AC;ctx.beginPath();ctx.arc(lp[0],lp[1],5,0,7);ctx.fill();
+        ctx.strokeStyle=th.panel;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(lp[0],lp[1],5,0,7);ctx.stroke();
+      }
+      break}
+    case "bars":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,13);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,13);ctx.stroke();
+      const px=x+36,pw=(b.w-72)/6,ph2=b.h-72;
+      const cols=[AC,shiftColor(AC,30),shiftColor(AC,60),shiftColor(AC,90),shiftColor(AC,120),shiftColor(AC,150)];
+      for(let i=0;i<6;i++){
+        const hgt=ph2*(0.35+0.6*rnd(i+seed))*clamp((t-b._br-0.5)*2-i*0.15,0,1);
+        ctx.fillStyle=cols[i];
+        rr(ctx,px+i*pw+pw*0.18,y+38+ph2-hgt,pw*0.64,hgt,6);ctx.fill();
+      }
+      break}
+    case "table":{
+      ctx.fillStyle=th.panel;rr(ctx,x,y,b.w,b.h,13);ctx.fill();
+      ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,x,y,b.w,b.h,13);ctx.stroke();
+      const rows=5,rh=(b.h-26)/rows;
+      for(let i=0;i<rows;i++){
+        if(t<b._br+0.6+i*0.12)break;
+        ctx.fillStyle=i%2?th.panel2:th.panel;
+        rr(ctx,x+14,y+13+i*rh,b.w-28,rh-4,7);ctx.fill();
+        ctx.fillStyle=AC;ctx.beginPath();ctx.arc(x+40,y+13+i*rh+rh/2-2,6.5,0,7);ctx.fill();
+        ctx.fillStyle=th.txt;ctx.font="500 12.5px Inter,'PingFang SC',sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+        ctx.fillText(["官网改版","小程序 2.0","品牌升级","增长实验","数据迁移"][i],x+58,y+13+i*rh+rh/2-2);
+        ctx.fillStyle=th.sub;ctx.textAlign="right";
+        ctx.fillText(["进行中","已上线","评审中","进行中","已排期"][i],x+b.w-36,y+13+i*rh+rh/2-2);
+      }
+      break}
+  }
+}
+function star(cx2,cy2,r){ctx.beginPath();
+  for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r2=i%2?r*0.45:r;
+    i?ctx.lineTo(cx2+Math.cos(a)*r2,cy2+Math.sin(a)*r2):ctx.moveTo(cx2+Math.cos(a)*r2,cy2+Math.sin(a)*r2)}
+  ctx.closePath();ctx.fill()}
+
+/* ================= chrome ================= */
+function drawChrome(th){
+  ctx.fillStyle=th.desk;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.shadowColor="rgba(0,0,0,.5)";ctx.shadowBlur=40;ctx.shadowOffsetY=14;
+  ctx.fillStyle=th.chromeBg;rr(ctx,WIN.x,WIN.y,WIN.w,WIN.h,14);ctx.fill();ctx.restore();
+  const dots=["#ff5f57","#febc2e","#28c840"];
+  dots.forEach((c,i)=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(WIN.x+26+i*22,WIN.y+WIN.chrome/2,6.5,0,7);ctx.fill()});
+  ctx.fillStyle=S.theme==="dark"?"#1c1c28":"#ffffff";
+  rr(ctx,WIN.x+110,WIN.y+11,WIN.w-220,26,13);ctx.fill();
+  ctx.fillStyle=th.sub;ctx.font="400 12.5px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText("🔒 acme.com",WIN.x+WIN.w/2,WIN.y+WIN.chrome/2);
+  ctx.save();ctx.beginPath();rr(ctx,WIN.x+1,WIN.y+WIN.chrome,WIN.w-2,WIN.h-WIN.chrome-1,12);ctx.clip();
+  ctx.fillStyle=th.pageBg;ctx.fillRect(WIN.x,WIN.y+WIN.chrome,WIN.w,WIN.h-WIN.chrome);
+  if(S.theme==="dark"){ctx.fillStyle="rgba(255,255,255,.035)";
+    for(let gx=WIN.x+20;gx<WIN.x+WIN.w;gx+=40)for(let gy=WIN.y+WIN.chrome+20;gy<WIN.y+WIN.h;gy+=40)ctx.fillRect(gx,gy,2,2)}
+  ctx.restore();
+}
+
+/* ================= 开场 / 收尾仪式 =================
+   ① 全员出场绕场一圈 → ② 1 号领队画布局、其余排成一列跟随
+   → ③ 散开各自搭建 → ④ 跟随领队再绕一圈后聚拢到屏幕中央收尾     */
+const LAYSEGS=(()=>{
+  const x0=LP.x+26,x1=LP.x+LP.w-26,y0=40,y1=862,s=[];
+  s.push([x0,y0,x1,y0],[x1,y0,x1,y1],[x1,y1,x0,y1],[x0,y1,x0,y0]);
+  for(let k=1;k<4;k++){                          // 竖向分区：蛇形往返，减少空笔跳线
+    const gx=LP.x+LP.w*k/4;
+    s.push(k%2?[gx,y0+10,gx,y1-10]:[gx,y1-10,gx,y0+10]);
+  }
+  for(let k=1;k<3;k++){                          // 横向分区：同样往返
+    const gy=y0+(y1-y0)*k/3;
+    s.push(k%2?[x1-10,gy,x0+10,gy]:[x0+10,gy,x1-10,gy]);
+  }
+  return s;
+})();
+const LAYEDGES=(()=>{
+  const es=[];let cur=null;
+  LAYSEGS.forEach((q,si)=>{
+    const [a,b,c,d]=q;
+    if(cur&&(Math.abs(cur[0]-a)>1||Math.abs(cur[1]-b)>1))
+      es.push({x1:cur[0],y1:cur[1],x2:a,y2:b,pen:false,frame:si<4});
+    es.push({x1:a,y1:b,x2:c,y2:d,pen:true,frame:si<4});
+    cur=[c,d];
+  });
+  es.forEach(e=>e.len=Math.hypot(e.x2-e.x1,e.y2-e.y1));
+  return es;
+})();
+const LAYLEN=LAYEDGES.reduce((s,e)=>s+e.len,0);
+function pathAt(u){
+  let d=clamp(u,0,1)*LAYLEN;
+  for(const e of LAYEDGES){
+    if(d<=e.len){const k=e.len?d/e.len:1;return {x:lerp(e.x1,e.x2,k),y:lerp(e.y1,e.y2,k)}}
+    d-=e.len;
+  }
+  const l=LAYEDGES[LAYEDGES.length-1];return {x:l.x2,y:l.y2};
+}
+function inCeremony(t){
+  return !!(isPage()&&intro&&(t<intro.build0||(intro.out0>0&&t>=intro.out0)));
+}
+/* ================= 片头字幕：标题 / 简介 / 网址 ================= */
+/* 元数据回退链：数据包 title/desc → 内置演示标题 → 页面里最大的文字元素 → 站点域名 */
+function metaTexts(){
+  const data=LPDATA||LPDATA_BUILTIN;
+  let title=String((data&&data.title)||"").trim();
+  let desc=String((data&&data.desc)||"").trim();
+  let url=String((data&&data.url)||"").trim()||lastGenUrl||SITE_LABEL||"";
+  if(!title)title=(data===LPDATA_BUILTIN&&S.title)?S.title:(SITE_LABEL||"自定义站点");
+  if(!desc){
+    const c=((data&&data.elems)||[]).filter(e=>e.txt&&(e.kind==="text"||(+e.fs||0)>=18)&&e.y<1400)
+      .sort((a,b)=>(+b.fs||0)-(+a.fs||0)||(b.w*b.h)-(a.w*a.h))[0];
+    if(c)desc=String(c.txt).trim();
+  }
+  if(!desc)desc=url;
+  return {title:title.slice(0,44),desc:desc.slice(0,64),url:url.slice(0,52)};
+}
+function trunc8(s,font,maxw){
+  ctx.font=font;let o=String(s);
+  while(o.length>1&&ctx.measureText(o+"…").width>maxw)o=o.slice(0,-1);
+  return o+(o.length<s.length?"…":"");
+}
+/* CJK 友好断行：优先标点/空格处断，兜底对半切，最多 maxn 行 */
+function wrapText(txt,font,maxw,maxn){
+  ctx.font=font;
+  if(ctx.measureText(txt).width<=maxw)return [String(txt)];
+  if(maxn<2)return [trunc8(txt,font,maxw)];
+  const mid=Math.floor(txt.length/2);
+  for(let k=0;k<=mid;k++){
+    for(const j of [mid-k,mid+k]){
+      if(j>0&&j<txt.length&&/[\s，。；、,.\-—·:：）)]/.test(txt[j])){
+        const a=txt.slice(0,j),b=txt.slice(j).replace(/^[\s，。；、,.\-—·:：]+/,"");
+        if(a&&b&&ctx.measureText(a).width<=maxw&&ctx.measureText(b).width<=maxw)return [a,b];
+      }
+    }
+  }
+  const h=Math.ceil(txt.length/2);
+  return [trunc8(txt.slice(0,h),font,maxw),trunc8(txt.slice(h),font,maxw)];
+}
+/* 片头三行文字的版式（屏幕坐标，居中舞台）。结果缓存到 intro._lay，每轮 generate 重建 */
+function titleLayout(){
+  const I=intro;if(!I)return null;
+  if(I._lay)return I._lay;
+  const m=(script._meta=script._meta||metaTexts()),lay=[],maxw=W-240;
+  ctx.save();
+  let fs=46;ctx.font="800 "+fs+"px Inter,'PingFang SC',sans-serif";
+  let tw=ctx.measureText(m.title).width;
+  if(tw>maxw){fs=Math.max(24,fs*maxw/tw);ctx.font="800 "+fs.toFixed(1)+"px Inter,'PingFang SC',sans-serif";tw=ctx.measureText(m.title).width}
+  lay.push({segs:[{text:m.title,tw,x0:W/2-tw/2,y:H*0.40}],h:fs*1.18,
+    font:ctx.font,color:"#f4f4f8",t0:I.tT0,t1:I.tT1,underline:true,uc:"rgba(150,134,255,.85)",uh:3});
+  const dls=wrapText(m.desc,"400 18px Inter,'PingFang SC',sans-serif",Math.min(maxw,660),2);
+  const dsegs=dls.map((s,i2)=>{const w2=ctx.measureText(s).width;
+    return {text:s,tw:w2,x0:W/2-w2/2,y:H*0.52+i2*30}});
+  lay.push({segs:dsegs,h:26,font:"400 18px Inter,'PingFang SC',sans-serif",
+    color:"rgba(214,216,230,.9)",t0:I.tD0,t1:I.tD1});
+  ctx.font="600 16px 'JetBrains Mono',monospace";
+  const uw=ctx.measureText(m.url).width;
+  lay.push({segs:[{text:m.url,tw:uw,x0:W/2-uw/2,y:H*0.645}],h:24,
+    font:"600 16px 'JetBrains Mono',monospace",color:S.accent,
+    t0:I.tU0,t1:I.tU1,underline:true,uc:"rgba(150,134,255,.5)",uh:2});
+  ctx.restore();
+  I._lay=lay;return lay;
+}
+/* 书写前沿：进度 p → 笔尖应在的屏幕坐标（多行简介顺序推进） */
+function titleFront(l,p){
+  const tot=l.segs.reduce((s,g)=>s+g.tw,0)||1;
+  let d=clamp(p,0,1)*tot;
+  for(let i=0;i<l.segs.length;i++){
+    const g=l.segs[i];
+    if(d<=g.tw||i===l.segs.length-1)return {x:g.x0+Math.min(d,g.tw),y:g.y};
+    d-=g.tw;
+  }
+  const g=l.segs[0];return {x:g.x0,y:g.y};
+}
+/* 片头编队：0/1/2 号光标各写一行（进场→贴线书写→收笔停驻），
+   其余光标从画面下方升起，在标题卡下缘列队观望 */
+function titlePos(c,t){
+  const I=intro,z=Math.max(cam.z,.6);
+  const s2w=(sx,sy)=>({x:(sx-W/2)/z+cam.x,y:(sy-H/2)/z+cam.y});
+  const L=titleLayout();if(!L)return null;
+  const i=c.i;
+  if(i<3){
+    const l=L[i],st=titleFront(l,0);
+    if(t<I.tl0-0.9)return null;
+    const rise=easeOut(clamp((t-(I.tl0-0.9))/0.55,0,1));
+    if(t<l.t0-0.45)return s2w(st.x-90,lerp(H+110,st.y+34,rise));
+    const pre=easeOut(clamp((t-(l.t0-0.45))/0.45,0,1));
+    if(t<l.t0)return s2w(lerp(st.x-90,st.x,pre),lerp(st.y+34,st.y,pre));
+    if(t>=l.t1){                                  // 收笔：停在线尾右侧轻晃
+      const e2=titleFront(l,1);
+      return s2w(e2.x+18+Math.sin(t*2.0+i*2.4)*2.4,e2.y+12+Math.cos(t*1.6+i)*5);
+    }
+    const p=easeIO(clamp((t-l.t0)/(l.t1-l.t0),0,1)),f=titleFront(l,p);
+    return s2w(f.x,f.y+Math.sin(t*2.3+i*2.1)*1.8);
+  }
+  const ent=easeOut(clamp((t-(I.tl0-i*0.02))/1.1,0,1));
+  const gx=W/2+(((i*7)%15)-7)*46,gy=H-96+((i%5)-2)*20;
+  return s2w(gx+Math.sin(t*0.9+i*1.3)*6,lerp(H+110,gy,ent)+Math.sin(t*1.5+i*2.1)*5);
+}
+/* 片头画面：三行文字按书写进度揭示（clip 跟随笔尖），标题与网址带光标扫出的下划线 */
+function drawTitleCard(t){
+  if(!isPage()||!intro||t<intro.tl0-0.55||t>=intro.tfade+0.6)return;
+  const A=easeOut(clamp((t-(intro.tl0-0.55))/0.4,0,1))*clamp((intro.tfade+0.6-t)/0.6,0,1);
+  if(A<=0.002)return;
+  const L=titleLayout();if(!L)return;
+  ctx.save();ctx.globalAlpha=A;ctx.textAlign="left";ctx.textBaseline="middle";
+  for(const l of L){
+    const p=clamp((t-l.t0)/(l.t1-l.t0),0,1);
+    if(p<=0)continue;
+    const tot=l.segs.reduce((s,g)=>s+g.tw,0)||1;
+    let d=p*tot;
+    for(const g of l.segs){
+      const gp=clamp(d/Math.max(g.tw,1),0,1);d-=g.tw;
+      if(gp<=0)continue;
+      ctx.save();ctx.beginPath();
+      ctx.rect(g.x0-8,g.y-l.h/2-8,g.tw*gp+12,l.h+16);ctx.clip();
+      ctx.font=l.font;ctx.fillStyle=l.color;
+      ctx.fillText(g.text,g.x0,g.y);
+      ctx.restore();
+      if(l.underline){                              // 下划线：滞后文字一线，像被笔再扫一遍
+        const up=easeIO(clamp((t-l.t0-0.12)/(l.t1-l.t0),0,1));
+        if(up>0){ctx.fillStyle=l.uc;
+          ctx.fillRect(g.x0,g.y+l.h*0.62,g.tw*up,l.uh)}
+      }
+    }
+  }
+  ctx.restore();
+}
+function ceremonyPos(c,t){
+  if(!isPage()||!intro||!intro.out0)return null;
+  const i=c.i,n=script?script.cursors.length:24,z=Math.max(cam.z,.6);
+  const P=c._p||{spin:0,lag:0,off:0},lead=i===0?0:1;  // 领队不抖动，保持与布局线严格同步
+  const s2w=(sx,sy)=>({x:(sx-W/2)/z+cam.x,y:(sy-H/2)/z+cam.y});
+  if(t<intro.tfade)return titlePos(c,t);              // ⓪ 片头：写字 + 列队
+  if(t<intro.lay0){                                   // ① 全员聚拢绕场一圈
+    const u=clamp((t-intro.spin0)/(intro.spin1-intro.spin0),0,1),e2=easeIO(u);
+    const a=-Math.PI/2+e2*Math.PI*2-i*0.052+lead*P.spin*0.5;
+    const ent=easeOut(clamp((t-intro.spin0-i*0.014)/0.5,0,1));
+    const r=(0.56+0.44*ent)*(1+lead*P.spin*0.45);
+    const tgt=s2w(W/2+560*r*Math.cos(a),H/2+272*r*Math.sin(a));
+    if(t<intro.spin1){                                // 从片头队形平滑汇入圆阵
+      const k=easeIO(clamp((t-intro.tfade)/0.7,0,1));
+      if(k<1){const from=titlePos(c,intro.tfade);
+        if(from)return {x:lerp(from.x,tgt.x,k),y:lerp(from.y,tgt.y,k)}}
+    }
+    return tgt;
+  }
+  if(t<intro.build0){                                 // ② 领队画布局，其余延迟跟随
+    const u=clamp((t-intro.lay0)/(intro.build0-intro.lay0),0,1);
+    const uu=clamp(easeIO(u)-i*0.0024-lead*P.lag*0.02,0,1);
+    const p=pathAt(uu),q=pathAt(Math.min(1,uu+0.002));
+    const dx=q.x-p.x,dy=q.y-p.y,ln=Math.hypot(dx,dy)||1;
+    const off=((i%5)-2)*11+lead*P.off;               // 列距不再完全等分
+    return {x:p.x-dy/ln*off,y:p.y+dx/ln*off};        // 五列纵队的跟随尾迹
+  }
+  if(t>=intro.out0){                                  // ④ 收尾：再绕一圈 → 中央定格
+    const u=clamp((t-intro.out0)/(intro.outSpin1-intro.out0),0,1);
+    const lag=i*0.048+lead*P.lag*0.5,a=-Math.PI/2+easeIO(u)*Math.PI*2-lag;
+    const ex=W/2+540*(1+lead*P.spin*0.12)*Math.cos(a),ey=H/2+262*(1+lead*P.lag*0.12)*Math.sin(a);
+    if(u<1)return s2w(ex,ey);
+    const g=clamp((t-intro.outSpin1)/(intro.outEnd-intro.outSpin1),0,1);
+    const k=easeIO(clamp(g-i*0.005-lead*P.lag*0.01,0,1));
+    const a2=-Math.PI/2+i/n*Math.PI*2+lead*P.spin*0.35;
+    return s2w(lerp(ex,W/2+322*(1+lead*P.spin*0.18)*Math.cos(a2),k),
+               lerp(ey,H/2+120*(1+lead*P.lag*0.18)*Math.sin(a2),k));
+  }
+  return null;
+}
+/* 布局线：随领队笔迹逐段画出（外框实线、分区虚线） */
+function drawLayoutLines(t,AC){
+  const u=clamp((t-intro.lay0)/(intro.build0-intro.lay0),0,1);
+  const d=easeIO(u)*LAYLEN,fade=clamp((intro.build0+0.55-t)/0.55,0,1);
+  ctx.save();ctx.lineCap="round";
+  ctx.shadowColor=AC;ctx.shadowBlur=9;
+  let acc=0;
+  for(const e of LAYEDGES){
+    if(d<=acc)break;
+    const q=clamp((d-acc)/e.len,0,1);acc+=e.len;
+    if(!e.pen)continue;
+    ctx.globalAlpha=(e.frame?0.92:0.5)*fade;
+    ctx.strokeStyle=e.frame?AC:"rgba(140,128,255,.9)";
+    ctx.lineWidth=e.frame?2.4:1.2;
+    ctx.setLineDash(e.frame?[]:[7,7]);
+    ctx.beginPath();ctx.moveTo(e.x1,e.y1);
+    ctx.lineTo(lerp(e.x1,e.x2,q),lerp(e.y1,e.y2,q));ctx.stroke();
+  }
+  ctx.setLineDash([]);ctx.restore();
+}
+/* 开场绕场：屏幕正中悬浮「光标工厂」品牌 Logo，光标绕它转一圈。
+   与顶栏 .logo 同源：紫色圆角方块 + 白色光标箭头 + CursorForge · 光标工厂 */
+function drawIntroLogo(t){
+  if(!isPage()||!intro)return;
+  const a0=intro.spin0,a1=intro.spin1,a2=intro.lay0;
+  if(t<a0-0.05||t>=a2)return;
+  const fin=easeOut(clamp((t-(a0-0.05))/0.42,0,1));
+  const fout=clamp((a2-t)/0.5,0,1);
+  const A=fin*fout;
+  if(A<=0.002)return;
+  const cx=W/2,cy=H/2,AC=S.accent;
+  const spin=clamp((t-a0)/(a1-a0),0,1);
+  ctx.save();ctx.globalAlpha=A;
+  // 呼吸光晕
+  const pulse=0.5+0.5*Math.sin(t*3.2);
+  const halo=ctx.createRadialGradient(cx,cy,18,cx,cy,230);
+  halo.addColorStop(0,"rgba(108,92,255,"+(0.20+0.10*pulse).toFixed(3)+")");
+  halo.addColorStop(1,"rgba(108,92,255,0)");
+  ctx.fillStyle=halo;ctx.fillRect(cx-230,cy-230,460,460);
+  // 绕行轨迹：随绕场进度逐段描出的椭圆细环（与光标轨迹 560×272 一致）
+  if(spin>0.001){
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,560,272,0,-Math.PI/2,-Math.PI/2+easeIO(spin)*Math.PI*2);
+    ctx.strokeStyle="rgba(146,134,255,.28)";ctx.lineWidth=1.6;ctx.stroke();
+  }
+  // 品牌方块
+  const S0=112,rad=26,bx=cx-S0/2,by=cy-S0/2-26;
+  ctx.save();
+  ctx.shadowColor="rgba(108,92,255,.7)";ctx.shadowBlur=42;
+  ctx.fillStyle=AC;rr(ctx,bx,by,S0,S0,rad);ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle="rgba(255,255,255,.30)";ctx.lineWidth=1.5;
+  rr(ctx,bx+.75,by+.75,S0-1.5,S0-1.5,rad-.75);ctx.stroke();
+  // 白色光标箭头：顶栏 SVG path（24×24 viewBox）等比放大居中
+  const IW=66,k=IW/24;
+  ctx.save();ctx.translate(cx-IW/2,by+(S0-IW)/2);ctx.scale(k,k);
+  ctx.fillStyle="#fff";ctx.beginPath();
+  ctx.moveTo(6,3);ctx.lineTo(6,20);ctx.lineTo(10.6,16.1);ctx.lineTo(13.3,22.2);
+  ctx.lineTo(16.5,20.8);ctx.lineTo(13.8,14.7);ctx.lineTo(19.7,14);
+  ctx.closePath();ctx.fill();
+  ctx.restore();
+  // 品牌名（与顶栏文字一致）
+  ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillStyle="#f0f0f4";ctx.font="700 25px Inter,'PingFang SC',sans-serif";
+  ctx.fillText("CursorForge · 光标工厂",cx,by+S0+34);
+  ctx.restore();
+}
+
+/* ================= cursors ================= */
+function cursorPos(c,t){
+  const cer=ceremonyPos(c,t);
+  if(cer)return cer;                       // 仪式阶段：位置由编队轨迹接管
+  const evs=evsByCursor[c.i]||[];
+  let px=c.x,py=c.y;
+  for(let i=0;i<evs.length;i++){
+    const e=evs[i],mv=e.moveDur||0.6;
+    if(t<e.t){const s0=e.t-mv;
+      if(t>=s0)return bezier(px,py,e.x,e.y,clamp((t-s0)/mv,0,1),c,i,e);
+      return {x:px+jx(c,t),y:py+jy(c,t)}}
+    px=e.x;py=e.y;
+  }
+  return {x:px+jx(c,t),y:py+jy(c,t)};
+}
+/* 待命时的游走：每只光标频率、相位、幅度都不同，不再是整齐的同步呼吸 */
+function jx(c,t){
+  const p=c._p||{jf:1.3,jp:0,ja:2.5};
+  return Math.sin(t*p.jf+p.jp)*p.ja+Math.sin(t*p.jf*2.17+p.jp*1.7)*p.ja*0.3;
+}
+function jy(c,t){
+  const p=c._p||{jf:1.1,jp:0,ja:2.5};
+  return Math.cos(t*p.jf*0.83+p.jp*1.3)*p.ja*0.85+Math.cos(t*p.jf*1.91+p.jp*0.6)*p.ja*0.25;
+}
+/* 每段移动都有独立手法：弯的方向/幅度、控制点偏前还是偏后、手腕低频摆动、
+   起步与收势节奏。所有额外偏移乘 sin(πk) 端点归零包络 —— 终点仍精确落在
+   元素框上，标尺投影、中心辅助线与像素级对齐完全不受影响。 */
+function bezier(x0,y0,x1,y1,u,c,ei,e){
+  if(!e)return {x:lerp(x0,x1,u),y:lerp(y0,y1,u)};
+  const dx=x1-x0,dy=y1-y0,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+  const straight=!!e.straight;
+  const R=n=>rnd(seed*0.37+c.i*13.77+ei*7.31+e.t*3.19+n*57.83);
+  const r0=R(1),r1=R(2),r2=R(3),r3=R(4);
+  const pace=0.80+r0*0.5;
+  const k=clamp(easeIO(u)*0.62+Math.pow(clamp(u,0,1),pace)*0.38,0,1);
+  const env=Math.sin(Math.PI*k);
+  // 拉框段只给「手画」级微弯，自由移动段才允许明显绕行
+  const maxB=straight?Math.min(7,len*0.035):Math.min(150,len*0.26);
+  const bend=(r1*2-1)*maxB*(0.32+0.68*r2);
+  const at=straight?0.5:(0.33+r3*0.34);
+  const cx2=x0+dx*at+nx*bend,cy2=y0+dy*at+ny*bend,v=1-k;
+  let x=v*v*x0+2*v*k*cx2+k*k*x1, y=v*v*y0+2*v*k*cy2+k*k*y1;
+  const amp=(straight?1.9:6.5)*(0.4+0.6*r0);
+  const off=Math.sin(k*Math.PI*(1.1+r1*1.5)+r2*6.283)*amp*env;
+  return {x:x+nx*off,y:y+ny*off};
+}
+const trails={};
+function drawCursor(c,t,th,now){
+  const uiA=pageUiAlpha(t);
+  if(uiA<=0)return;                            // 成品巡览：光标全部退场
+  const evs=evsByCursor[c.i]||[];
+  if(!evs.length&&!isPage())return;
+  if(t<(c.join||0))return;                     // 还没进场
+  const jk=clamp((t-(c.join||0))/0.28,0,1);    // 进场淡入
+  const first=evs[0];
+  if(!inCeremony(t)&&first&&t<first.t-(first.moveDur||0.6)-0.2)return;
+  const p=cursorPos(c,t);
+  const P=c._p||{tw:0.28,tline:3,tilt:0,size:1,bounce:0.28};
+  if(S.trail){
+    /* now 是 rAF 的毫秒时间戳，拖尾窗口必须换算成毫秒；
+       原先按 0.28（秒）比较，导致每帧只剩一个点、拖尾实际不可见。 */
+    const TW=P.tw*1000;
+    (trails[c.i]=trails[c.i]||[]).push({x:p.x,y:p.y,t:now});
+    const arr=trails[c.i];
+    while(arr.length&&now-arr[0].t>TW)arr.shift();
+    ctx.save();
+    for(let i=1;i<arr.length;i++){
+      const a=clamp(1-(now-arr[i].t)/TW,0,1)*0.34*uiA;
+      ctx.globalAlpha=a;ctx.strokeStyle=c.color;ctx.lineWidth=P.tline;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(arr[i-1].x,arr[i-1].y);ctx.lineTo(arr[i].x,arr[i].y);ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(P.tilt);
+  if(isPage()&&c.i===0&&inCeremony(t)){        // 领队光环
+    ctx.save();ctx.globalAlpha=(0.45+0.3*Math.sin(t*6))*uiA;
+    ctx.strokeStyle="#ffffff";ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.arc(0,0,21,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+  // 按下/松手瞬间光标弹一下
+  const act=evs.find(e=>(e.kind==="press"||e.kind==="release"||e.kind==="grab"||e.kind==="ungrab")&&t>=e.t&&t-e.t<0.22);
+  const cs=act?1+P.bounce*Math.sin((t-act.t)/0.22*Math.PI):1;
+  ctx.globalAlpha=jk*uiA;
+  const sc=1.4*P.size*cs*(0.62+0.38*jk);
+  ctx.scale(sc,sc);
+  ctx.beginPath();
+  ctx.moveTo(0,0);ctx.lineTo(0,17);ctx.lineTo(4.6,13.2);ctx.lineTo(7.4,19);ctx.lineTo(10,17.6);ctx.lineTo(7.3,11.9);ctx.lineTo(12.6,11.4);ctx.closePath();
+  ctx.fillStyle=c.color;ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.95)";ctx.lineWidth=1.6;ctx.stroke();
+  ctx.restore();
+  if(S.names&&!inCeremony(t)){                 // 仪式编队只留光标，密集队形不被名字糊住
+    ctx.save();ctx.globalAlpha=jk*uiA;
+    ctx.font="600 13px Inter,'PingFang SC',sans-serif";
+    const tw=ctx.measureText(c.name).width;
+    ctx.fillStyle=c.color;rr(ctx,p.x+14,p.y+12,tw+16,24,12);ctx.fill();
+    ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(c.name,p.x+22,p.y+25);
+    ctx.restore();
+  }
+}
+
+/* ================= effects ================= */
+function drawEffects(t){
+  if(inReview(t))return;                     // 成品巡览：不再有任何涟漪/参考线
+  for(const e of script.events){
+    if(e.kind!=="release"&&e.kind!=="press"&&e.kind!=="ungrab")continue;
+    const p=t-e.t;
+    if(p<0||p>0.6)continue;
+    const k=easeOut(p/0.6),b=e.block;
+    const bx=e.x,by=e.y;
+    const big=e.kind==="release"&&!e.txtEv;   // 文字事件用小特效
+    ctx.save();
+    ctx.globalAlpha=(1-k)*(big?0.85:0.4);
+    ctx.strokeStyle=e.c.color;ctx.lineWidth=big?2.5:1.8;
+    ctx.beginPath();ctx.arc(bx,by,(big?14:8)+k*(big?60:24),0,7);ctx.stroke();
+    if(big){
+      ctx.globalAlpha=(1-k)*0.3;
+      ctx.beginPath();ctx.arc(bx,by,8+k*30,0,7);ctx.stroke();
+      if(S.guides){
+        const gx0=isPage()?LP.x:CT.x, gw2=isPage()?LP.w:CT.w;
+        const gy0=isPage()?0:CT.y, gh2=isPage()?LP.H:CT.h;
+        ctx.globalAlpha=(1-k)*0.55;
+        ctx.strokeStyle=S.accent;ctx.lineWidth=1.5;ctx.setLineDash([8,6]);
+        ctx.beginPath();ctx.moveTo(gx0,by);ctx.lineTo(gx0+gw2,by);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(bx,gy0);ctx.lineTo(bx,gy0+gh2);ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if(S.spark){
+        ctx.globalAlpha=1-k;
+        for(let i=0;i<10;i++){
+          const a=i/10*Math.PI*2+e.t,sp2=(40+rnd(i+e.t*9)*90)*k+20;
+          ctx.fillStyle=i%2?e.c.color:S.accent;
+          ctx.beginPath();ctx.arc(bx+Math.cos(a)*sp2,by+Math.sin(a)*sp2,3*(1-k)+1,0,7);ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+  }
+}
+/* 结晶闪光：辅助层退场、页面还原为成品的一瞬 */
+function drawFinalizeFlash(t){
+  if(!inReview(t))return;
+  const u=clamp((t-intro.review0)/0.6,0,1);
+  if(u>=1)return;
+  ctx.save();
+  ctx.globalAlpha=(1-u)*0.20;ctx.fillStyle="#ffffff";ctx.fillRect(0,0,W,H);
+  const y=u*H;
+  const g=ctx.createLinearGradient(0,y-46,0,y+46);
+  g.addColorStop(0,"rgba(140,185,255,0)");g.addColorStop(.5,"rgba(175,210,255,.9)");g.addColorStop(1,"rgba(140,185,255,0)");
+  ctx.globalAlpha=(1-u)*0.8;ctx.fillStyle=g;ctx.fillRect(0,y-46,W,92);
+  ctx.restore();
+}
+let confetti=null;
+function drawFinale(t){
+  const pg=isPage()&&intro;
+  const T0=pg?intro.card0:script.duration-1.7;
+  const T1=pg?intro.card1:Infinity;
+  const done=script.blocks.every(b=>t>=b._br+0.6);
+  if(!S.confetti||!done||t<T0||t>T1)return;
+  if(!confetti){confetti=[];for(let i=0;i<80;i++){const a=rnd(i*3)*Math.PI*2,sp2=140+rnd(i*5)*300;
+    confetti.push({x:W/2,y:170,vx:Math.cos(a)*sp2,vy:Math.sin(a)*sp2-160,c:CCOLORS[i%CCOLORS.length],s:5+rnd(i*7)*6,r:rnd(i*9)*7})}}
+  const dt2=t-T0,fadeOut=clamp((T1-t)/0.45,0,1);
+  ctx.save();
+  for(const p of confetti){
+    const x=p.x+p.vx*dt2,y=p.y+p.vy*dt2+300*dt2*dt2;
+    ctx.globalAlpha=clamp((2.1-dt2),0,1)*0.95*fadeOut;
+    ctx.fillStyle=p.c;
+    ctx.save();ctx.translate(x,y);ctx.rotate(p.r+dt2*4);ctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);ctx.restore();
+  }
+  ctx.globalAlpha=clamp((t-T0)*1.6,0,1)*fadeOut;
+  /* 收尾报告：元素数只算真实 DOM 元素（不含 9 条背景带），子代理即并行光标 */
+  const nElem=isPage()?script.blocks.filter(b=>b.type==="elem").length:script.blocks.length;
+  const nAgent=script.cursors.length;
+  const mins=(script.duration/60).toFixed(1);
+  const msg="总共 "+nElem+" 个元素，"+nAgent+" 个子代理，用时 "+mins+" 分钟，已按要求完成设计。";
+  const bw=Math.min(940,W-120),bh=78,bx=W/2-bw/2,by=H*0.5-bh/2;
+  ctx.fillStyle="rgba(14,14,20,.95)";rr(ctx,bx,by,bw,bh,18);ctx.fill();
+  ctx.strokeStyle=S.accent;ctx.lineWidth=1.5;rr(ctx,bx,by,bw,bh,18);ctx.stroke();
+  ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";
+  let fs=24;
+  ctx.font="700 "+fs+"px Inter,'PingFang SC',sans-serif";
+  const mw=ctx.measureText(msg).width;
+  if(mw>bw-44){fs=Math.max(13,fs*(bw-44)/mw);ctx.font="700 "+fs.toFixed(1)+"px Inter,'PingFang SC',sans-serif"}
+  ctx.fillText(msg,W/2,H/2);
+  ctx.restore();ctx.globalAlpha=1;
+}
+
+/* ================= camera ================= */
+const cam={x:W/2,y:H/2,z:1.06};
+function updateCamera(t,dt){
+  let fx=W/2,fy=H/2,tz=1.06;
+  if(inReview(t)){                              // 巡览：镜头直接精确跟随，不做 lerp 滞后
+    cam.x=W/2;cam.y=clamp(reviewY(t),H/2,LP.H-H/2);cam.z=1.0;
+    return;
+  }
+  if(isPage()){
+    fx=LP.x+LP.w/2;
+    if(intro&&t<intro.tfEnd){fy=H/2;tz=1.06}          // 片头字幕：镜头钉在舞台正中
+    else{
+    const half=()=>H/(2*Math.max(cam.z,0.62));
+    let bestW=-1;
+    for(const b of script.blocks){
+      if(b.type!=="elem")continue;
+      if(t>=b._tl-0.06&&t<=(b._end||b._br)){if(b._wave>bestW)bestW=b._wave}
+    }
+    let fy2;
+    if(bestW<0){
+      fy2=t<(intro?(intro.build0+0.4):2.2)?half():cam.y;
+      tz=S.cam?1.0:1.0;
+    }else{
+      let sum=0,n=0;
+      for(const b of script.blocks){
+        if(b.type!=="elem"||b._wave!==bestW)continue;
+        sum+=by(b)+b.h/2;n++;
+      }
+      fy2=n?sum/n:cam.y;
+      tz=S.cam?1.06:1.0;
+    }
+    if(isPage()&&intro&&t>=intro.out0){fy2=cam.y;tz=1.0}   // 收尾仪式：镜头稳住，光标聚到屏幕中央
+    else if(t>script.duration-1.8)fy2=LP.H-half();
+    fy=clamp(fy2,half(),LP.H-half());
+    }
+  }else if(S.cam){
+    let focus=null,best=-1;
+    for(const e of script.events){
+      if(e.kind!=="release")continue;
+      if(t>=e.t-0.7&&t<=e.t+1.0&&e.t>best){best=e.t;focus=e}
+    }
+    if(focus){fx=focus.x;fy=focus.y;tz=1.13}
+    const T0=script.duration-1.8;
+    if(t>T0){fx=W/2;fy=H/2;tz=1.02}
+    if(t<0.9){fx=W/2;fy=H/2;tz=1.04}
+  }
+  const k=1-Math.pow(isPage()?0.004:0.0018,dt);
+  cam.x=lerp(cam.x,fx,k);cam.y=lerp(cam.y,fy,k);cam.z=lerp(cam.z,tz,k*0.8);
+  const vw=W/(2*cam.z),vh=H/(2*cam.z);
+  if(isPage()){
+    cam.x=clamp(cam.x,W/2,W/2);
+    cam.y=clamp(cam.y,vh,LP.H-vh);
+  }else{
+    cam.x=clamp(cam.x,vw-40,W-vw+40);cam.y=clamp(cam.y,vh-30,H-vh+30);
+  }
+}
+
+/* ================= render ================= */
+const cv=$("#cv"),ctx=cv.getContext("2d");
+const dpr=Math.min(devicePixelRatio||1,2);
+cv.width=W*dpr;cv.height=H*dpr;
+function fitStage(){
+  const wrap=$("#stageWrap"),k=Math.min((wrap.clientWidth-40)/W,(wrap.clientHeight-20)/H);
+  $("#stage").style.width=Math.round(W*k)+"px";$("#stage").style.height=Math.round(H*k)+"px";
+}
+addEventListener("resize",fitStage);
+function render(t,dt,now){
+  const th=theme();
+  updateCamera(t,dt);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=th.desk;ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(W/2,H/2);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
+  if(isPage()){
+    if(inReview(t)){
+      // ⑤ 成品：辅助层退场后，直接还原为完整网页（整页截图一次成型）
+      ctx.save();
+      rr(ctx,LP.x,0,LP.w,LP.H,18);ctx.clip();
+      if(LPIMG.complete&&LPIMG.naturalWidth)
+        ctx.drawImage(LPIMG,0,0,LPIMG.naturalWidth,LPIMG.naturalHeight,LP.x,0,LP.w,LP.H);
+      else{ctx.fillStyle=th.pageBg;ctx.fillRect(LP.x,0,LP.w,LP.H)}
+      ctx.restore();
+    }else{
+    // 画布底：领队开始画布局时淡入
+    const pf=clamp((t-(intro?intro.lay0-0.25:0))/0.6,0,1);
+    ctx.save();ctx.globalAlpha=pf;
+    ctx.shadowColor="rgba(0,0,0,.55)";ctx.shadowBlur=50;ctx.shadowOffsetX=0;
+    ctx.fillStyle=th.pageBg;rr(ctx,LP.x,0,LP.w,LP.H,18);ctx.fill();
+    ctx.restore();
+    // ② 布局线：随领队笔迹逐段描出，画完后短暂淡出
+    if(intro&&t>=intro.lay0&&t<intro.build0+0.6)drawLayoutLines(t,S.accent);
+    const vT=cam.y-H/(2*Math.max(cam.z,.6))-120,
+          vB=cam.y+H/(2*Math.max(cam.z,.6))+120;
+    for(const b of script.blocks){
+      const y0=by(b);
+      if(y0+b.h<vT||y0>vB)continue;          // 视口外的块跳过，314 块时省掉大半绘制
+      drawBlock(b,t,th);
+    }
+    }
+    drawEffects(t);
+    ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
+    drawTitleCard(t);                        // 片头字幕：文字在光标层之下，笔尖压字拖出
+    ctx.restore();
+    for(const c of script.cursors)drawCursor(c,t,th,now);
+  }else{
+    drawChrome(th);
+    ctx.save();
+    ctx.beginPath();rr(ctx,WIN.x+1,WIN.y+WIN.chrome,WIN.w-2,WIN.h-WIN.chrome-1,12);ctx.clip();
+    for(const b of script.blocks)drawBlock(b,t,th);
+    drawEffects(t);
+    ctx.restore();
+    for(const c of script.cursors)drawCursor(c,t,th,now);
+  }
+  ctx.restore();
+  if(isPage())drawIntroLogo(t);              // 开场绕场：中央品牌 Logo
+  if(isPage())drawRulers(th,t);
+  drawFinalizeFlash(t);
+  drawFinale(t);
+}
+/* ================= Photoshop 式标尺 ================= */
+const RH=22;                                     // 标尺厚度
+function drawRulers(th,t){
+  if(!script)return;
+  const uiA=pageUiAlpha(t);
+  if(uiA<=0)return;
+  const s=cam.z, ox=W/2, oy=H/2;
+  const wx2sx=wx=>(wx-cam.x)*s+ox;
+  const wy2sy=wy=>(wy-cam.y)*s+oy;
+  const sx2css=sx=>((sx-ox)/s+cam.x-LP.x)/LP.k;
+  const sy2css=sy=>((sy-oy)/s+cam.y)/LP.k;
+
+  ctx.save();ctx.globalAlpha=uiA;
+  // 面板底
+  ctx.fillStyle="rgba(11,11,18,.93)";
+  ctx.fillRect(0,0,W,RH);ctx.fillRect(0,0,RH,H);
+  ctx.fillStyle="rgba(6,6,10,.99)";ctx.fillRect(0,0,RH,RH);
+  ctx.strokeStyle="rgba(255,255,255,.15)";ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,RH+.5);ctx.lineTo(W,RH+.5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(RH+.5,0);ctx.lineTo(RH+.5,H);ctx.stroke();
+
+  // 刻度步长自适应
+  const cands=[10,20,25,50,100,200,250,500,1000,2000];
+  let step=1000;
+  for(const c of cands){if(c*LP.k*s>=52){step=c;break}}
+  const minor=step/5;
+
+  // ---- 顶部水平标尺 ----
+  const c0=sx2css(RH),c1=sx2css(W);
+  ctx.font="9px Inter,system-ui,sans-serif";
+  ctx.textAlign="left";ctx.textBaseline="top";
+  let m0=Math.floor(c0/minor)*minor;
+  for(let c=m0;c<=c1;c+=minor){
+    const sx=wx2sx(LP.x+c*LP.k);
+    if(sx<RH-1)continue;
+    const isMajor=Math.abs(c/step-Math.round(c/step))<1e-6;
+    ctx.fillStyle=isMajor?"rgba(255,255,255,.55)":"rgba(255,255,255,.22)";
+    ctx.fillRect(Math.round(sx)+.5,RH-(isMajor?7:4),1,isMajor?7:4);
+    if(isMajor){
+      ctx.fillStyle="rgba(255,255,255,.62)";
+      ctx.fillText(String(Math.round(c)),Math.round(sx)+3,4);
+    }
+  }
+  // ---- 左侧垂直标尺 ----
+  const r0=sy2css(RH),r1=sy2css(H);
+  let n0=Math.floor(r0/minor)*minor;
+  for(let c=n0;c<=r1;c+=minor){
+    const sy=wy2sy(c*LP.k);
+    if(sy<RH-1)continue;
+    const isMajor=Math.abs(c/step-Math.round(c/step))<1e-6;
+    ctx.fillStyle=isMajor?"rgba(255,255,255,.55)":"rgba(255,255,255,.22)";
+    ctx.fillRect(RH-(isMajor?7:4),Math.round(sy)+.5,isMajor?7:4,1);
+    if(isMajor&&step>=50){
+      ctx.save();
+      ctx.translate(4,Math.round(sy)+3);ctx.rotate(-Math.PI/2);
+      ctx.textAlign="right";ctx.textBaseline="top";
+      ctx.fillStyle="rgba(255,255,255,.62)";
+      ctx.fillText(String(Math.round(c)),0,0);
+      ctx.restore();
+    }
+  }
+
+  // ---- 当前选区在标尺上的投影（拉线时跟着走）----
+  const sel=[];
+  for(const b of script.blocks){
+    if(b.type!=="elem")continue;
+    if(t>=b._tl&&t<=(b._end||b._br))sel.push(b);
+  }
+  sel.forEach((b,idx)=>{
+    const r=frameRect(b,t);                 // 微调拖动时投影与素材同步
+    const pf=easeIO(clamp((t-b._tl)/b._fDur,0,1));
+    const x0=wx2sx(r.x), x1=wx2sx(r.x+r.w*pf);
+    const y0=wy2sy(r.y), y1=wy2sy(r.y+r.h*pf);
+    const newest=idx===sel.length-1;
+    ctx.fillStyle=newest?"rgba(108,92,255,.45)":"rgba(108,92,255,.20)";
+    ctx.fillRect(Math.max(RH,x0),0,Math.max(0,Math.min(W,x1)-Math.max(RH,x0)),RH);
+    ctx.fillRect(0,Math.max(RH,y0),RH,Math.max(0,Math.min(H,y1)-Math.max(RH,y0)));
+    ctx.fillStyle=newest?"rgba(140,128,255,.95)":"rgba(140,128,255,.5)";
+    ctx.fillRect(Math.round(Math.max(RH,x0)),0,1,RH);
+    ctx.fillRect(Math.round(Math.min(W,x1)),0,1,RH);
+    ctx.fillRect(0,Math.round(Math.max(RH,y0)),RH,1);
+    ctx.fillRect(0,Math.round(Math.min(H,y1)),RH,1);
+    // 拉线时的对齐参考线：从选区边缘延伸到整块画布，端点贴住标尺
+    if(newest){
+      const ax=Math.max(RH,Math.min(W,x0)),bx2=Math.max(RH,Math.min(W,x1));
+      const ay=Math.max(RH,Math.min(H,y0)),by2=Math.max(RH,Math.min(H,y1));
+      ctx.save();
+      ctx.setLineDash([3,5]);ctx.lineWidth=1;ctx.strokeStyle="rgba(140,128,255,.42)";
+      ctx.beginPath();
+      ctx.moveTo(Math.round(ax)+.5,RH);ctx.lineTo(Math.round(ax)+.5,H);
+      ctx.moveTo(Math.round(bx2)+.5,RH);ctx.lineTo(Math.round(bx2)+.5,H);
+      ctx.moveTo(RH,Math.round(ay)+.5);ctx.lineTo(W,Math.round(ay)+.5);
+      ctx.moveTo(RH,Math.round(by2)+.5);ctx.lineTo(W,Math.round(by2)+.5);
+      ctx.stroke();ctx.setLineDash([]);
+      // 标尺上方的实时读数（CSS 像素）
+      const cssX=Math.round((r.x-LP.x)/LP.k),cssY=Math.round(r.y/LP.k);
+      const cssW=Math.round(b.w*pf/LP.k),cssH=Math.round(b.h*pf/LP.k);
+      const lab="X "+cssX+"   W "+cssW;
+      ctx.font="600 10px 'JetBrains Mono',monospace";
+      const lw=ctx.measureText(lab).width+14;
+      const lxp=Math.max(RH+4,Math.min(W-lw-4,bx2+6)),lyp=RH+4;
+      ctx.fillStyle="rgba(108,92,255,.92)";rr(ctx,lxp,lyp,lw,18,5);ctx.fill();
+      ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText(lab,lxp+7,lyp+9);
+      const lab2="Y "+cssY+"   H "+cssH;
+      const lw2=ctx.measureText(lab2).width+14;
+      const lyp2=Math.max(RH+4,Math.min(H-lw2-4,by2+6));
+      ctx.save();ctx.translate(RH+4,lyp2);ctx.rotate(-Math.PI/2);
+      ctx.fillStyle="rgba(108,92,255,.92)";rr(ctx,0,0,lw2,18,5);ctx.fill();
+      ctx.fillStyle="#fff";ctx.fillText(lab2,7,9);ctx.restore();
+      ctx.restore();
+    }
+  });
+
+  // ---- 画框时的中心辅助线：横竖贯通画布并连到两条标尺 ----
+  const GL="#5aadff";
+  const guides=[];
+  for(const b of script.blocks){
+    if(b.type!=="elem"||t<b._tl||t>=b._br)continue;
+    const r=frameRect(b,t);
+    const cx=wx2sx(r.x+r.w/2),cy=wy2sy(r.y+r.h/2);
+    if(cx<RH+2||cx>W-2||cy<RH+2||cy>H-2)continue;
+    const a=clamp((t-b._tl)/0.12,0,1)*clamp((b._br-t)/0.18,0,1);
+    if(a<=0)continue;
+    guides.push({b,r,cx,cy,a});
+  }
+  const gv=guides.slice(-8);
+  let leadI=0;
+  gv.forEach((g,i)=>{if(g.a>gv[leadI].a)leadI=i});
+  gv.forEach((g,i)=>{
+    const lead=i===leadI;
+    ctx.save();
+    ctx.globalAlpha=uiA*g.a*(lead?1:0.62);
+    ctx.strokeStyle=GL;ctx.lineWidth=lead?1.3:1;
+    ctx.setLineDash(lead?[]:[3,7]);
+    if(lead){ctx.shadowColor="rgba(90,173,255,.55)";ctx.shadowBlur=6}
+    ctx.beginPath();
+    ctx.moveTo(Math.round(g.cx)+.5,RH);ctx.lineTo(Math.round(g.cx)+.5,H);
+    ctx.moveTo(RH,Math.round(g.cy)+.5);ctx.lineTo(W,Math.round(g.cy)+.5);
+    ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(g.cx,g.cy,lead?7:4,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+    // 与标尺的连接点：亮线 + 三角标记
+    ctx.save();ctx.globalAlpha=uiA*g.a;ctx.fillStyle=GL;
+    ctx.fillRect(Math.round(g.cx)-1,0,2,RH);
+    ctx.fillRect(0,Math.round(g.cy)-1,RH,2);
+    ctx.beginPath();ctx.moveTo(g.cx-4.5,0);ctx.lineTo(g.cx+4.5,0);ctx.lineTo(g.cx,6.5);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(0,g.cy-4.5);ctx.lineTo(0,g.cy+4.5);ctx.lineTo(6.5,g.cy);ctx.closePath();ctx.fill();
+    ctx.restore();
+  });
+  // 主选区的中心坐标读数（放在第二行，避开 X/W 读数）
+  if(gv.length){
+    const g=gv[leadI];
+    const px=Math.round((g.r.x-LP.x+g.r.w/2)/LP.k),py=Math.round((g.r.y+g.r.h/2)/LP.k);
+    ctx.save();ctx.globalAlpha=uiA*Math.max(0.9,gv[leadI].a);
+    ctx.font="600 10px 'JetBrains Mono',monospace";
+    const s1="CX "+px,w1=ctx.measureText(s1).width+14;
+    const x1=Math.max(RH+4,Math.min(W-w1-4,g.cx+6));
+    ctx.fillStyle=GL;rr(ctx,x1,RH+26,w1,17,5);ctx.fill();
+    ctx.fillStyle="#06101e";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(s1,x1+7,RH+34.5);
+    const s2="CY "+py,w2=ctx.measureText(s2).width+14;
+    const y2=Math.max(RH+4,Math.min(H-w2-4,g.cy+6));
+    ctx.save();ctx.translate(RH+26,y2);ctx.rotate(-Math.PI/2);
+    ctx.fillStyle=GL;rr(ctx,0,0,w2,17,5);ctx.fill();
+    ctx.fillStyle="#06101e";ctx.fillText(s2,7,8.5);ctx.restore();
+    ctx.restore();
+  }
+
+  // ---- 光标位置指示线 ----
+  for(const c of script.cursors){
+    if(t<(c.join||0))continue;
+    const p=cursorPos(c,t);
+    const sx=wx2sx(p.x),sy=wy2sy(p.y);
+    if(sx>RH&&sx<W){ctx.fillStyle=c.color;ctx.globalAlpha=.9*uiA;ctx.fillRect(Math.round(sx),RH-4,1.4,4)}
+    if(sy>RH&&sy<H){ctx.fillStyle=c.color;ctx.globalAlpha=.9*uiA;ctx.fillRect(RH-4,Math.round(sy),4,1.4)}
+    ctx.globalAlpha=uiA;
+  }
+
+  // 角标：文档名 + 缩放
+  ctx.fillStyle="rgba(255,255,255,.5)";
+  ctx.font="700 9px Inter,system-ui,sans-serif";
+  ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText("LP",RH/2,RH/2);
+  ctx.textAlign="left";
+  ctx.fillStyle="rgba(255,255,255,.4)";
+  ctx.font="9px Inter,system-ui,sans-serif";
+  ctx.fillText((typeof SITE_LABEL!=="undefined"?SITE_LABEL:LPDATA.host||"livepartner.fans")+
+    "  ·  "+Math.round(LPDATA.vw)+" × "+Math.round(LPDATA.docH)+" px  ·  "+Math.round(cam.z*100)+"%",RH+8,RH+12);
+  // 阶段标识
+  if(intro){
+    const fb=intro.firstBuild||intro.build0;
+    const ph=t<intro.lay0?"①  全员集结 · 绕场":t<intro.build0?"②  领队画布局 · 编队跟随"
+      :t<fb?"②  铺设底色 · 版面就位"
+      :t<intro.out0?"③  并行搭建 · "+script.cursors.length+" 只光标"
+      :!inReview(t)?"④  收尾编队 · 居中":"⑤  全页预览 · 还原成品";
+    ctx.font="600 11px Inter,'PingFang SC',sans-serif";
+    const pw=ctx.measureText(ph).width+20;
+    ctx.fillStyle="rgba(20,20,32,.9)";rr(ctx,W-pw-10,RH+7,pw,22,7);ctx.fill();
+    ctx.strokeStyle="rgba(108,92,255,.55)";ctx.lineWidth=1;rr(ctx,W-pw-10,RH+7,pw,22,7);ctx.stroke();
+    ctx.fillStyle="rgba(220,220,255,.92)";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(ph,W-pw,RH+18);
+  }
+  ctx.restore();
+}
+
+/* 实拍模式：固定在屏幕顶部的地址栏 + 上下渐隐 */
+function drawUrlBar(th,alpha){
+  alpha=alpha===undefined?1:alpha;
+  ctx.save();ctx.globalAlpha=alpha;
+  const bw=300,bh=32,bx=W/2-bw/2,by=12;
+  const gTop=ctx.createLinearGradient(0,0,0,86);
+  gTop.addColorStop(0,th.desk);gTop.addColorStop(1,"rgba(8,8,12,0)");
+  ctx.fillStyle=th.desk==="#08080c"?"#08080c":gTop;
+  ctx.globalAlpha=0.92;ctx.fillStyle=gTop;ctx.fillRect(0,0,W,86);ctx.globalAlpha=1;
+  ctx.fillStyle=S.theme==="dark"?"rgba(24,24,34,.92)":"rgba(255,255,255,.94)";
+  ctx.shadowColor="rgba(0,0,0,.45)";ctx.shadowBlur=22;ctx.shadowOffsetY=5;
+  rr(ctx,bx,by,bw,bh,16);ctx.fill();
+  ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+  ctx.strokeStyle=th.line;ctx.lineWidth=1;rr(ctx,bx,by,bw,bh,16);ctx.stroke();
+  ["#ff5f57","#febc2e","#28c840"].forEach((c,i)=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(bx+18+i*15,by+bh/2,4.5,0,7);ctx.fill()});
+  ctx.fillStyle=th.sub;ctx.font="400 12px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText("livepartner.fans",bx+bw/2+18,by+bh/2);
+  const gBot=ctx.createLinearGradient(0,H-70,0,H);
+  gBot.addColorStop(0,"rgba(8,8,12,0)");gBot.addColorStop(1,th.desk);
+  ctx.fillStyle=gBot;ctx.fillRect(0,H-70,W,70);
+  ctx.restore();
+}
+
+/* ================= playback & controls ================= */
+generate();
+fitStage();
+let last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.05);last=now;
+  if(S.playing){
+    S.clock+=dt*S.speed;
+    if(S.clock>script.duration){S.clock=0;confetti=null;for(const k2 in trails)delete trails[k2]}
+  }
+  render(S.clock,dt*S.speed,now);
+  $("#scrub").value=Math.round(S.clock/script.duration*1000);
+  $("#timeLbl").textContent=S.clock.toFixed(1)+" / "+script.duration.toFixed(1)+"s";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+$("#scrub").addEventListener("input",e=>{
+  S.playing=false;syncPlayBtn();
+  S.clock=e.target.value/1000*script.duration;confetti=null;
+  for(const k2 in trails)delete trails[k2];
+});
+function syncPlayBtn(){
+  $("#playBtn").innerHTML=S.playing
+    ?'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+    :'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
+}
+$("#playBtn").onclick=()=>{S.playing=!S.playing;syncPlayBtn()};
+$("#restartBtn").onclick=()=>{S.clock=0;confetti=null;S.playing=true;syncPlayBtn();for(const k2 in trails)delete trails[k2]};
+$("#shuffleBtn").onclick=()=>{seed=rnd(seed*97+3)*100;generate();confetti=null;S.clock=0;for(const k2 in trails)delete trails[k2];toast("已重新编排光标脚本")};
+
+/* ================= 网址 → 自动生成搭建动效 =================
+   单文件纯前端，跨域抓取走多通道自动回退：
+     ① 同源 /api/capture（若以带抓取能力的服务部署，直接返回标准数据包）
+     ② 公共 CORS 代理取 HTML → srcdoc 同源 iframe 渲染 → 读真实 DOM 布局
+     ③ 「导入」站点数据包（布局 .json + 整页截图 .png），100% 可靠通道
+   产出 {vw,docH,backs,elems} + 整页图，替换 LPDATA / LPIMG 后重建时间轴。 */
+const hostOf=u=>{try{return new URL(u).hostname}catch(e){return "自定义站点"}};
+const genStat=(m,k)=>{
+  const el=$("#genStat");el.textContent=m||"";el.className="genstat"+(k?" "+k:"");
+  /* 窄屏隐藏状态条，进度同步到输入框占位符，任何宽度都能看到反馈 */
+  $("#urlIn").placeholder=m||"粘贴网址，自动生成搭建动效…";
+};
+let lastDiag=[],apiDiag="";
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function fetchTimeout(url,ms=9000,opt={}){
+  const ac=new AbortController(),id=setTimeout(()=>ac.abort(),ms);
+  try{return await fetch(url,Object.assign({},opt,{signal:ac.signal}))}finally{clearTimeout(id)}
+}
+function normUrl(s){
+  s=(s||"").trim();if(!s)return "";
+  if(!/^https?:\/\//i.test(s))s="https://"+s;
+  try{const u=new URL(s);return /^https?:$/.test(u.protocol)?u.href:""}catch(e){return ""}
+}
+/* ⓪ 本地站点包：同源静态文件，零跨域、100% 可靠。
+   新增站点只需往 sites/ 放 布局 .json + 整页 .png 并登记 manifest.json，
+   之后输入该网址即可直接生成，无需任何代理或后端。 */
+async function localPack(url){
+  const h=hostOf(url).toLowerCase();
+  try{
+    const m=await fetchTimeout("sites/manifest.json",5000);
+    if(m.ok){
+      const mf=await m.json(),e=mf[h]||mf[h.replace(/^www\./,"")];
+      if(e){
+        const j=await fetchTimeout(e.json,10000);
+        if(j.ok){
+          try{
+            const data=await j.json();
+            if(data&&data.elems&&data.elems.length)
+              return {data,img:e.png||null,label:data.host||h,how:"本地站点包"};
+          }catch(_){}
+        }
+      }
+    }
+  }catch(e){}
+  if(h==="livepartner.fans"||h==="www.livepartner.fans")
+    return {data:JSON.parse(JSON.stringify(LPDATA_BUILTIN)),img:LPIMG_BUILTIN,label:h,how:"内置站点包"};
+  return null;
+}
+/* ① 服务端真实渲染采集（无头 Chrome；静态部署时不存在，会自动落到 ②③） */
+async function captureViaApi(url){
+  apiDiag="/api/capture · ";
+  try{
+    const r=await fetchTimeout("/api/capture?url="+encodeURIComponent(url),75000);
+    const ct=(r.headers.get("content-type")||"").split(";")[0];
+    if(!r.ok||!ct.includes("json")){apiDiag+="不可用（HTTP "+r.status+"，返回 "+(ct||"未知")+"）";return null}
+    const j=await r.json();
+    if(!j||!j.ok||!j.data||!j.data.elems||!j.data.elems.length){
+      apiDiag+="渲染失败（"+((j&&j.error)||"返回数据为空")+"）";return null}
+    apiDiag+="可用"+(j.cached?"（缓存）":"");
+    return {data:j.data,img:j.png||null,label:j.host||hostOf(url)};
+  }catch(e){apiDiag+="连接失败（"+(e.name==="AbortError"?"超时":"网络错误")+"）";return null}
+}
+/* ② 公共 CORS 代理：并行竞速，任一返回 HTML 即胜出；总耗时最多 ~9s */
+const PROXIES=[
+  {n:"allorigins/raw",mk:u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u)},
+  {n:"allorigins/get",mk:u=>"https://api.allorigins.win/get?url="+encodeURIComponent(u),json:true},
+  {n:"codetabs",mk:u=>"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(u)},
+  {n:"corsproxy.io",mk:u=>"https://corsproxy.io/?url="+encodeURIComponent(u)},
+  {n:"cors.lol",mk:u=>"https://api.cors.lol/?url="+encodeURIComponent(u)},
+  {n:"isomorphic-git",mk:u=>"https://cors.isomorphic-git.org/"+u.replace(/^https?:\/\//,"")}
+];
+let proxyDiag=[];
+async function fetchHtml(url){
+  proxyDiag=[];
+  /* ⓪ 同源网关：部署在自有服务器上时由后端代抓 HTML，零跨域、最快最稳。
+     静态托管下此接口不存在（404/返回登录页），自动落到公共代理。 */
+  try{
+    const r=await fetchTimeout("/api/fetch?url="+encodeURIComponent(url),18000);
+    const s=await r.text();
+    if(r.ok&&s&&s.length>200&&/<html|<body|<div/i.test(s))return {html:s,how:"服务器网关"};
+    proxyDiag.push("服务器网关 · "+(r.ok?"响应非网页 HTML":"HTTP "+r.status));
+  }catch(e){proxyDiag.push("服务器网关 · "+(e.name==="AbortError"?"请求超时":"不可用"))}
+  return await new Promise(resolve=>{
+    if(!PROXIES.length){resolve(null);return}
+    let left=PROXIES.length,won=false;
+    PROXIES.forEach(async p=>{
+      let why="";
+      try{
+        const r=await fetchTimeout(p.mk(url),9000);
+        if(!r.ok)why=p.n+" · HTTP "+r.status+(r.status===401?"（需 API Key）":"");
+        else{
+          let s=await r.text();
+          if(p.json){try{s=(JSON.parse(s)||{}).contents||""}catch(_){s=""}}
+          if(s&&s.length>200&&/<html|<body|<div/i.test(s)){
+            if(!won){won=true;resolve({html:s,how:p.n})}
+          }else why=p.n+" · 响应非网页 HTML";
+        }
+      }catch(e){why=p.n+" · "+(e.name==="AbortError"?"请求超时":"被浏览器拦截 / 网络不可达")}
+      if(why)proxyDiag.push(why);
+      if(--left===0&&!won)resolve(null);
+    });
+  });
+}
+/* 懒加载兜底：很多站点首屏外的图片要等滚动/JS 才会写入 src，
+   服务端抓回来的是纯 HTML，必须在沙箱里手动补齐，否则截图就是空的。 */
+function promoteLazyMedia(d){
+  const KEYS=["data-src","data-original","data-lazy-src","data-original-src","data-url","data-echo","data-lazy","data-srcset","data-bg","data-background-image"];
+  const pick=el=>{for(const k of KEYS){const v=el.getAttribute(k);if(v)return {k,v}}return null};
+  d.querySelectorAll("img").forEach(im=>{
+    if(im.getAttribute("loading")==="lazy")im.removeAttribute("loading");
+    try{im.loading="eager"}catch(e){}
+    try{im.referrerPolicy="no-referrer"}catch(e){}          // 绕过一部分防盗链
+    const cur=im.getAttribute("src")||"";
+    if(!cur||/^(data:image\/(gif|png|svg)|blob:)/i.test(cur)){
+      const p=pick(im);
+      if(p&&p.k!=="data-srcset")im.setAttribute("src",p.v.split(/[\s,]+/)[0]);
+    }
+    if(!im.getAttribute("srcset")&&im.getAttribute("data-srcset"))
+      im.setAttribute("srcset",im.getAttribute("data-srcset"));
+  });
+  d.querySelectorAll("source[data-src]").forEach(s=>{
+    try{s.setAttribute("srcset",s.getAttribute("data-src"))}catch(e){}
+  });
+  /* noscript 里的备用 <img>：无 JS 时它是唯一来源 */
+  d.querySelectorAll("noscript").forEach(n=>{
+    if(!n.parentElement||!/<img/i.test(n.textContent||""))return;
+    const box=document.createElement("div");box.innerHTML=n.textContent;
+    box.querySelectorAll("img").forEach(im=>{
+      const src=im.getAttribute("src")||"";
+      if(!src||/^data:/i.test(src))return;
+      if([...n.parentElement.querySelectorAll("img")].some(o=>o.getAttribute("src")===src))return;
+      try{im.referrerPolicy="no-referrer"}catch(e){}
+      n.parentElement.insertBefore(im,n);
+    });
+  });
+  d.querySelectorAll("[data-background-image],[data-bg]").forEach(el=>{
+    const v=el.getAttribute("data-background-image")||el.getAttribute("data-bg");
+    if(v)el.style.backgroundImage="url("+v+")";
+  });
+}
+/* 等图片真实加载（而非固定秒数），progress 汇报 x/y */
+function waitImagesLoaded(d,cap,prog){
+  const imgs=[...d.images].filter(im=>im.getAttribute("src"));
+  if(!imgs.length)return Promise.resolve();
+  const t0=Date.now();
+  return new Promise(res=>{
+    const tick=()=>{
+      let done=0;
+      for(const im of imgs)if(im.complete&&!(im.naturalWidth===0&&!im.currentSrc))done++;
+      if(prog)prog("加载图片 "+done+"/"+imgs.length);
+      if(done>=imgs.length||Date.now()-t0>cap)return res();
+      setTimeout(tick,400);
+    };
+    tick();
+  });
+}
+/* srcdoc 与父页同源 → 可直接读 DOM；sandbox 禁脚本，避免第三方 JS 越权。
+   w 可指定渲染宽度：离线生成站点包时必须与整页截图的视口宽一致，否则纵向错位。
+   prog(text) 用于把「滚动加载 / 图片 x/y」进度透出到状态条 ——
+   图片没就绪就开始生成，是外部网站缺图缺元素的主要原因。 */
+async function renderRemote(html,url,w,prog){
+  const u=new URL(url),base=u.origin+u.pathname.replace(/[^/]*$/,"");
+  const inject='<base href="'+base.replace(/"/g,"&quot;")+'">'+
+    '<style>html,body{margin:0!important;overflow:visible!important;'+
+    'height:auto!important;min-height:0!important;max-height:none!important}'+
+    '*{animation:none!important;transition:none!important}'+
+    '::-webkit-scrollbar{display:none}</style>';
+  const h=/<head[^>]*>/i.test(html)?html.replace(/<head[^>]*>/i,m=>m+inject):inject+html;
+  const f=document.createElement("iframe");
+  f.setAttribute("sandbox","allow-same-origin");
+  f.style.cssText="position:fixed;left:-20000px;top:0;width:"+(w||1280)+"px;height:1000px;border:0;opacity:0;pointer-events:none";
+  f.srcdoc=h;
+  document.body.appendChild(f);
+  try{
+    if(prog)prog("正在渲染页面…");
+    await new Promise((res,rej)=>{
+      const to=setTimeout(res,20000);f.onload=()=>{clearTimeout(to);res()};
+      f.onerror=()=>{clearTimeout(to);rej(new Error("iframe 载入失败"))};
+    });
+    await sleep(700);
+    const d=f.contentDocument;
+    if(!d||!d.body)throw new Error("无法读取页面 DOM");
+    promoteLazyMedia(d);
+    /* 整页滚动一遍：触发滚动式懒加载（视口外的图、懒加载背景图） */
+    const win=d.defaultView;
+    let H=0;
+    try{H=Math.max(d.body.scrollHeight,d.documentElement.scrollHeight)}catch(e){}
+    if(H>1000){
+      const step=Math.max(500,Math.round((w||1280)*0.8));
+      for(let y=0;y<H;y+=step){
+        win.scrollTo(0,y);
+        if(prog)prog("滚动加载 "+Math.min(99,Math.round(y/H*100))+"%");
+        await sleep(160);
+      }
+      win.scrollTo(0,0);
+      await sleep(350);
+    }
+    await waitImagesLoaded(d,20000,prog);
+    await sleep(450);
+    return {doc:d,iframe:f};
+  }catch(e){f.remove();throw e}
+}
+function parseBg(s){
+  const m=(s||"").match(/rgba?\(([^)]+)\)/);
+  if(!m)return null;
+  const p=m[1].split(",").map(Number);
+  if(p.length>3&&p[3]<0.15)return null;
+  if(p.slice(0,3).some(v=>!isFinite(v)))return null;
+  return p.slice(0,3).map(Math.round);
+}
+function bgOf(el,d){
+  let n=el;
+  while(n&&n!==d.documentElement){
+    const c=parseBg(d.defaultView.getComputedStyle(n).backgroundColor);
+    if(c)return c;
+    n=n.parentElement;
+  }
+  return [12,12,18];
+}
+/* 把真实 DOM 变成 presets() 可直接消费的 LPDATA 结构 */
+function extractLayout(d,host){
+  const win=d.defaultView;
+  const vw=Math.max(320,Math.min(2200,Math.round(d.documentElement.scrollWidth||1280)));
+  const docH=Math.max(600,Math.min(16000,Math.round(Math.max(
+    d.body.scrollHeight,d.documentElement.scrollHeight,d.body.getBoundingClientRect().height)||900)));
+  const skip=new Set(["script","style","noscript","iframe","svg","path","br","hr","meta","link","head","title","option","source","picture"]);
+  const cand=[];
+  for(const el of d.body.querySelectorAll("*")){
+    const tag=el.tagName.toLowerCase();if(skip.has(tag))continue;
+    const cs=win.getComputedStyle(el);
+    if(cs.display==="none"||cs.visibility==="hidden"||parseFloat(cs.opacity||1)<0.08)continue;
+    const r=el.getBoundingClientRect(),w=r.width,h=r.height;
+    if(w<12||h<10||w>vw*1.5||h>docH)continue;
+    const x=Math.round(r.left+win.scrollX),y=Math.round(r.top+win.scrollY);
+    if(y<-200||y>docH+200)continue;
+    const direct=[...el.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim())
+      .map(n=>n.textContent.trim()).join(" ").slice(0,10);
+    const hasBgImg=/url\(/.test(cs.backgroundImage||"");
+    const structural=/^(a|button|input|img|h1|h2|h3|h4|h5|h6|p|li|section|article|header|footer|nav)$/.test(tag);
+    if(el.children.length&&!direct&&!hasBgImg&&!structural)continue;
+    const fs=parseFloat(cs.fontSize)||14,small=w*h<9000;
+    let kind;
+    if(/^(img|i|canvas)$/.test(tag)||(hasBgImg&&w<120&&h<120))kind="icon";
+    else if(tag==="a")kind="link";
+    else if(/^(button|input|select|textarea)$/.test(tag))kind="ctrl";
+    else if(/^h[1-6]$/.test(tag)||(fs>=24&&direct))kind="text";
+    else if(direct&&small)kind="txt";
+    else kind="card";
+    const detail=(small||kind==="icon"||kind==="txt")?1:0;
+    const bg=parseBg(cs.backgroundColor)||bgOf(el,d);
+    const lum=0.299*bg[0]+0.587*bg[1]+0.114*bg[2];
+    const mx=Math.max(bg[0],bg[1],bg[2]),mn=Math.min(bg[0],bg[1],bg[2]);
+    cand.push({tag,x,y,w:Math.round(w),h:Math.round(h),r:parseFloat(cs.borderRadius)||0,
+      kind,detail,scene:Math.max(0,Math.floor(y/700)),
+      fs:Math.round(fs),txt:direct||(kind==="icon"?"图标":""),col:cs.color||"rgb(240,240,248)",
+      fw:String(cs.fontWeight||"400"),bt:bg,bb:bg,vivid:(mx-mn>70&&lum>90)?1:0});
+  }
+  cand.sort((a,b)=>a.y-b.y||b.w*b.h-a.w*b.h);
+  const chosen=[];
+  for(const e of cand){
+    const dup=chosen.some(s=>{
+      const ox=Math.max(0,Math.min(e.x+e.w,s.x+s.w)-Math.max(e.x,s.x));
+      const oy=Math.max(0,Math.min(e.y+e.h,s.y+s.h)-Math.max(e.y,s.y));
+      return ox*oy/Math.max(1,e.w*e.h)>0.90&&e.w*e.h>0.72*(s.w*s.h);
+    });
+    if(!dup)chosen.push(e);
+  }
+  const perScene=new Map(),elems=[];
+  for(const e of chosen){
+    const n=perScene.get(e.scene)||0;
+    if(n>=46||elems.length>=340)continue;
+    perScene.set(e.scene,n+1);
+    elems.push({tag:e.tag,x:e.x,y:e.y,w:e.w,h:e.h,r:e.r,kind:e.kind,detail:e.detail,
+      scene:e.scene,fs:e.fs,txt:e.txt,col:e.col,fw:e.fw,bt:e.bt,bb:e.bb,vivid:e.vivid,
+      bg:"rgb("+e.bt.join(",")+")",pos:"relative"});
+  }
+  const bodyBg=parseBg(win.getComputedStyle(d.body).backgroundColor)||
+               parseBg(win.getComputedStyle(d.documentElement).backgroundColor)||[12,12,18];
+  const backs=[],step=Math.max(360,Math.round(docH/12));
+  for(let y=0;y<docH;y+=step){
+    const hit=elems.filter(e=>e.y<=y+step/2&&e.y+e.h>=y+step/2&&e.w>vw*0.5)
+      .sort((a,b)=>b.w-a.w)[0];
+    const c=hit?hit.bt:bodyBg;
+    backs.push({y,h:Math.min(step,docH-y),bg:"rgb("+c.join(",")+")"});
+  }
+  const metaEl=d.querySelector('meta[name="description"],meta[property="og:description"]');
+  return {vw,docH,backs,elems,host:host||"自定义站点",
+    title:(d.title||"").replace(/\s+/g," ").trim().slice(0,60),
+    desc:String((metaEl&&metaEl.getAttribute("content"))||"").replace(/\s+/g," ").trim().slice(0,120)};
+}
+/* 整页画面：优先 html2canvas；失败则用元素采样色生成一张可对齐的近似图 */
+async function loadH2C(){
+  if(window.html2canvas)return window.html2canvas;
+  const cdns=["https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"];
+  for(const src of cdns){
+    try{
+      await new Promise((res,rej)=>{
+        const s=document.createElement("script");s.src=src;
+        s.onload=res;s.onerror=()=>{s.remove();rej(new Error("cdn"))};
+        document.head.appendChild(s);setTimeout(()=>rej(new Error("timeout")),7000);
+      });
+      if(window.html2canvas)return window.html2canvas;
+    }catch(e){}
+  }
+  return null;
+}
+function fallbackImage(data){
+  const s=Math.min(1,12000/Math.max(data.docH,1));
+  const c=document.createElement("canvas");
+  c.width=Math.max(1,Math.round(data.vw*s));c.height=Math.max(1,Math.round(data.docH*s));
+  const g=c.getContext("2d");g.scale(s,s);
+  (data.backs||[]).forEach(b=>{g.fillStyle=b.bg;g.fillRect(0,b.y,data.vw,b.h)});
+  (data.elems||[]).forEach(e=>{
+    if(e.kind==="card"||e.kind==="ctrl"){
+      g.fillStyle="rgb("+(e.bt||[24,24,34]).join(",")+")";g.fillRect(e.x,e.y,e.w,e.h);
+    }
+    if(e.txt){
+      g.fillStyle=e.col||"#e8e8f0";g.textBaseline="top";
+      g.font=(parseInt(e.fw,10)>=600?"700 ":"400 ")+Math.min(e.fs||14,30)+"px sans-serif";
+      g.fillText(String(e.txt).slice(0,24),e.x+2,e.y+2,e.w);
+    }
+  });
+  return c.toDataURL("image/png");
+}
+async function screenshotPage(d,data){
+  const h2c=await loadH2C();
+  if(h2c){
+    try{
+      const cv=await h2c(d.documentElement,{backgroundColor:"#ffffff",scale:1,useCORS:true,
+        logging:false,width:data.vw,height:Math.min(data.docH,12000),
+        windowWidth:data.vw,windowHeight:900,scrollX:0,scrollY:0,
+        ignoreElements:el=>/^(IFRAME|SCRIPT|STYLE)$/.test(el.tagName)});
+      return cv.toDataURL("image/png");
+    }catch(e){}
+  }
+  return fallbackImage(data);
+}
+/* 替换数据源 → 重算世界坐标 → 重建整套光标时间轴 → 从头播放 */
+async function applySite(data,imgSrc,label){
+  if(!data||!data.elems||!data.elems.length)throw new Error("布局数据为空");
+  data.vw=+data.vw||985;data.docH=+data.docH||900;
+  await new Promise((res,rej)=>{
+    let done=false;
+    const fin=ok=>{if(done)return;done=true;LPIMG.onload=null;LPIMG.onerror=null;
+      ok?res():rej(new Error("整页图片加载失败"))};
+    LPIMG.onload=()=>fin(true);LPIMG.onerror=()=>fin(false);
+    LPIMG.src=imgSrc;
+    if(LPIMG.complete&&LPIMG.naturalWidth)fin(true);
+    setTimeout(()=>fin(!!(LPIMG.complete&&LPIMG.naturalWidth)),6000);
+  });
+  LPDATA=data;SITE_LABEL=label||"自定义站点";
+  LP.k=LP.w/data.vw;LP.H=data.docH*LP.k;
+  seed=7;generate();
+  confetti=null;S.clock=0;S.playing=true;syncPlayBtn();
+  for(const k in trails)delete trails[k];
+}
+async function runGenerate(){
+  const url=normUrl($("#urlIn").value);
+  if(!url){genStat("请输入有效网址","err");$("#urlIn").focus();return}
+  lastGenUrl=url;
+  const btn=$("#genBtn");btn.disabled=true;btn.textContent="生成中";
+  try{
+    genStat("正在匹配站点…","busy");
+    let pack=await localPack(url),how=pack?pack.how:"";
+    if(!pack){
+      genStat("正在服务端渲染页面…（首访约 10~30 秒）","busy");
+      pack=await captureViaApi(url);how="服务端渲染";
+    }
+    if(!pack){
+      genStat("正在读取页面…","busy");
+      const got=await fetchHtml(url);
+      if(!got){
+        lastDiag=[apiDiag,"浏览器直连 · 同源策略（CORS）禁止读取第三方 HTML"].concat(proxyDiag);
+        showGenHelp(lastDiag);
+        throw new Error("跨域读取失败 · 点击查看诊断与替代方案");
+      }
+      genStat("正在解析布局…","busy");
+      const {doc,iframe}=await renderRemote(got.html,url,m=>genStat(m,"busy"));
+      let data;
+      try{data=extractLayout(doc,hostOf(url));genStat("正在生成画面…","busy");
+          pack={data,img:await screenshotPage(doc,data),label:hostOf(url)};
+      }finally{iframe.remove()}
+      if(!pack.data.elems.length)throw new Error("没有解析到可见元素");
+      how="浏览器解析 · "+got.how;
+    }
+    genStat("正在编排光标…","busy");
+    if(pack&&!pack.data.url)pack.data.url=url;
+    await applySite(pack.data,pack.img||fallbackImage(pack.data),pack.label);
+    genStat(pack.label+" · "+pack.data.elems.length+" 个元素 · "+how,"");
+    toast("已生成 "+pack.data.elems.length+" 个元素的搭建动效，点「导出」保存视频");
+  }catch(e){
+    genStat(e.message||"生成失败","err");
+    toast("生成失败："+(e.message||"未知错误"));
+  }finally{btn.disabled=false;btn.textContent="生成"}
+}
+/* 失败诊断面板：把每个通道的真实原因摊开，并给出三条零跨域通道 */
+function showGenHelp(diag,src){
+  $("#ghDiag").textContent=(diag&&diag.length?diag:["无可用通道"]).join("\n");
+  $("#genHelp").hidden=false;
+  $("#helpView").hidden=!!src;$("#srcView").hidden=!src;
+}
+const hideGenHelp=()=>{$("#genHelp").hidden=true};
+$("#genStat").onclick=()=>{
+  if($("#genStat").classList.contains("err"))
+    showGenHelp(lastDiag.length?lastDiag:[apiDiag,"浏览器直连 · 同源策略（CORS）禁止读取第三方 HTML"].concat(proxyDiag));
+};
+$("#ghClose").onclick=hideGenHelp;
+$("#srcCancel").onclick=hideGenHelp;
+$("#ghSrc").onclick=()=>showGenHelp(lastDiag,true);
+$("#srcBack").onclick=()=>showGenHelp(lastDiag,false);
+$("#ghImport").onclick=()=>{hideGenHelp();$("#packIn").click()};
+$("#ghRetry").onclick=()=>{hideGenHelp();runGenerate()};
+async function buildFromSource(html,base){
+  if(!html||html.length<200||!/<html|<body|<div/i.test(html))throw new Error("源码内容太少，请复制完整 HTML");
+  const {doc,iframe}=await renderRemote(html,base);
+  let data,img=null;
+  try{data=extractLayout(doc,hostOf(base));genStat("正在生成画面…","busy");
+      img=await screenshotPage(doc,data);
+  }finally{iframe.remove()}
+  if(!data||!data.elems.length)throw new Error("没有解析到可见元素");
+  genStat("正在编排光标…","busy");
+  await applySite(data,img||fallbackImage(data),hostOf(base));
+  return data;
+}
+$("#srcGo").onclick=async()=>{
+  const b=$("#srcGo");b.disabled=true;b.textContent="解析中";
+  try{
+    genStat("正在解析源码…","busy");
+    const base=lastGenUrl||"https://example.com/";
+    const data=await buildFromSource($("#srcTa").value.trim(),base);
+    hideGenHelp();
+    genStat(hostOf(base)+" · "+data.elems.length+" 个元素 · 源码解析","");
+    toast("已由网页源码生成 "+data.elems.length+" 个元素的搭建动效");
+  }catch(e){
+    genStat("源码解析失败："+e.message,"err");toast("源码解析失败："+e.message);
+  }finally{b.disabled=false;b.textContent="解析并生成"}
+};
+$("#genBtn").onclick=runGenerate;
+$("#urlIn").addEventListener("keydown",e=>{if(e.key==="Enter")runGenerate()});
+$("#packBtn").onclick=()=>$("#packIn").click();
+$("#packIn").onchange=async e=>{
+  const fs=[...e.target.files],jf=fs.find(f=>/\.json$/i.test(f.name)),
+        pf=fs.find(f=>/\.png$/i.test(f.name)),hf=fs.find(f=>/\.html?$/i.test(f.name));
+  if(!jf&&!hf){toast("请选择布局 .json（可同时选 .png）或网页源码 .html");e.target.value="";return}
+  e.target.value="";
+  if(!jf&&hf){
+    try{
+      genStat("正在解析源码…","busy");
+      const base=lastGenUrl||"https://"+(hf.name.replace(/\.html?$/i,"")||"site")+"/";
+      const data=await buildFromSource(await hf.text(),base);
+      genStat(hostOf(base)+" · "+data.elems.length+" 个元素 · 源码解析","");
+      toast("已由 .html 源码生成 "+data.elems.length+" 个元素的搭建动效");
+    }catch(err){genStat("源码解析失败："+err.message,"err");toast("源码解析失败："+err.message)}
+    return;
+  }
+  try{
+    genStat("正在载入数据包…","busy");
+    const data=JSON.parse(await jf.text());
+    let img=null;
+    if(pf)img=await new Promise((res,rej)=>{
+      const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(pf);
+    });
+    await applySite(data,img||fallbackImage(data),data.host||jf.name.replace(/\.json$/i,""));
+    genStat((data.host||"数据包")+" · "+data.elems.length+" 个元素","");
+    toast("已载入数据包，点「导出」保存视频");
+  }catch(err){genStat("数据包无效："+err.message,"err");toast("数据包无效："+err.message)}
+  e.target.value="";
+};
+$("#restoreBtn").onclick=async()=>{
+  genStat("正在还原…","busy");
+  try{
+    await applySite(LPDATA_BUILTIN,LPIMG_BUILTIN,"livepartner.fans");
+    $("#urlIn").value="";
+    genStat("内置官网演示 · "+LPDATA_BUILTIN.elems.length+" 个元素","");
+    toast("已恢复内置官网演示");
+  }catch(e){genStat("还原失败："+e.message,"err")}
+};
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+  if(e.code==="Space"){e.preventDefault();$("#playBtn").click()}
+  if(e.code==="ArrowRight")S.clock=Math.min(script.duration,S.clock+0.5);
+  if(e.code==="ArrowLeft")S.clock=Math.max(0,S.clock-0.5);
+});
+$("#presetSel").addEventListener("change",e=>{S.preset=e.target.value;generate();S.clock=0;confetti=null;
+  cam.x=W/2;cam.y=H/2;cam.z=1.06;for(const k2 in trails)delete trails[k2]});
+$("#titleInput").addEventListener("input",e=>{S.title=e.target.value;generate()});
+$("#accent").addEventListener("input",e=>S.accent=e.target.value);
+$("#c_skel").addEventListener("change",e=>S.skel=e.target.checked);
+$("#c_confetti").addEventListener("change",e=>S.confetti=e.target.checked);
+$("#c_names").addEventListener("change",e=>S.names=e.target.checked);
+$("#c_cam").addEventListener("change",e=>S.cam=e.target.checked);
+$("#c_trail").addEventListener("change",e=>{S.trail=e.target.checked;if(!S.trail)for(const k2 in trails)delete trails[k2]});
+$("#c_guides").addEventListener("change",e=>S.guides=e.target.checked);
+$("#c_spark").addEventListener("change",e=>S.spark=e.target.checked);
+$("#themeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  S.theme=b.dataset.v;$$("#themeSeg button").forEach(x=>x.classList.toggle("on",x===b))});
+$("#fmtSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  S.fmt=b.dataset.v;$$("#fmtSeg button").forEach(x=>x.classList.toggle("on",x===b))});
+$("#fpsSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  S.fps=parseInt(b.dataset.v);$$("#fpsSeg button").forEach(x=>x.classList.toggle("on",x===b))});
+function $$(s){return document.querySelectorAll(s)}
+[["nCur","v_nCur",v=>v],["speed","v_speed",v=>v.toFixed(2)]].forEach(([k2,lbl,fmt])=>{
+  const r=$("#r_"+k2),v=$("#"+lbl);
+  const u=()=>{S[k2]=parseFloat(r.value);v.textContent=fmt(parseFloat(r.value));if(k2==="nCur")generate()};
+  r.addEventListener("input",u);u()});
+
+/* ================= export ================= */
+let exporting=false,cancelExp=false;
+function pickMime(fmt){
+  if(fmt==="mp4"){for(const m of ["video/mp4;codecs=avc1.640028","video/mp4"])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;return null}
+  for(const m of ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;return null;
+}
+function setModal(show,title,sub){$("#modal").hidden=!show;if(title)$("#mTitle").textContent=title;if(sub)$("#mSub").textContent=sub}
+function prog(k,sub){$("#mBar").style.width=Math.round(k*100)+"%";$("#mPct").textContent=Math.round(k*100)+"%";if(sub)$("#mSub").textContent=sub}
+$("#mCancel").onclick=()=>cancelExp=true;
+function download(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+async function doExport(){
+  if(exporting)return;
+  exporting=true;cancelExp=false;confetti=null;
+  const wasPlaying=S.playing,wasClock=S.clock;S.playing=false;
+  const base="cursorforge-"+(SITE_LABEL||S.preset).replace(/[^a-z0-9.-]/gi,"-")+"-v3";
+  try{
+    if(S.fmt==="png"){
+      setModal(true,"渲染 PNG…",W+" × "+H);prog(0.5);render(S.clock,0.016,performance.now());prog(1);
+      const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+      download(blob,base+"-"+S.clock.toFixed(1)+"s.png");
+    }else if(S.fmt==="gif"){await exportGIF(base)}
+    else{await exportVideo(base)}
+  }catch(err){console.error(err);toast("导出失败："+err.message)}
+  setModal(false);exporting=false;S.playing=wasPlaying;S.clock=wasClock;confetti=null;
+}
+async function exportVideo(base){
+  let mime=pickMime(S.fmt),fmtUsed=S.fmt;
+  if(!mime&&S.fmt==="mp4"){mime=pickMime("webm");fmtUsed="webm";toast("当前浏览器不支持 MP4 录制，已改用 WebM")}
+  if(!mime)throw new Error("MediaRecorder 不可用");
+  setModal(true,"正在录制 "+fmtUsed.toUpperCase()+"…",W+" × "+H+" · "+S.fps+" fps");
+  const stream=cv.captureStream(S.fps);
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:14_000_000});
+  const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  const done=new Promise(r=>rec.onstop=r);
+  rec.start(200);
+  const wall=script.duration/S.speed,t0=performance.now();
+  S.clock=0;cam.x=W/2;cam.y=isPage()?H/2:H/2;cam.z=isPage()?1.0:1.06;
+  await new Promise(res=>{(function step(){
+    if(cancelExp){res();return}
+    const e=(performance.now()-t0)/1000;
+    const c=Math.min(e*S.speed,script.duration);
+    S.clock=c;render(c,0.016,performance.now());
+    prog(e/wall);
+    if(e>=wall){res();return}
+    requestAnimationFrame(step)})()});
+  rec.stop();await done;
+  if(cancelExp){toast("已取消导出");return}
+  const blob=new Blob(chunks,{type:mime.split(";")[0]});
+  download(blob,base+"."+fmtUsed);
+  toast(fmtUsed.toUpperCase()+" 导出完成 · "+(blob.size/1048576).toFixed(1)+" MB");
+}
+async function exportGIF(base){
+  setModal(true,"加载 GIF 编码器…","");
+  let gifenc;
+  try{gifenc=await import("https://cdn.jsdelivr.net/npm/gifenc@1.0.3/+esm")}
+  catch(e){toast("GIF 编码器加载失败，改用 WebM");await exportVideo(base+"-gif");return}
+  const gw=Math.round(W*0.55),gh=Math.round(H*0.55);
+  const fps=Math.min(S.fps,20);
+  // 长视频（实拍模式约 33s）帧数上限内按比例拉长每帧间隔，保证 GIF 播放速度符合真实时长
+  const n=Math.min(Math.round(script.duration/S.speed*fps),240);
+  const delay=Math.max(20,Math.round(script.duration/S.speed*1000/n));
+  setModal(true,"编码 GIF…",gw+" × "+gh+" · "+n+" 帧");
+  const c=document.createElement("canvas");c.width=gw;c.height=gh;
+  const x=c.getContext("2d",{willReadFrequently:true});
+  const {GIFEncoder,quantize,applyPalette}=gifenc;
+  const gif=GIFEncoder();
+  for(let i=0;i<n;i++){
+    if(cancelExp)break;
+    const tt=i/n*script.duration;
+    render(tt,0.016,performance.now());
+    x.drawImage(cv,0,0,gw,gh);
+    const data=x.getImageData(0,0,gw,gh).data;
+    const pal=quantize(data,256,{format:"rgb565"});
+    gif.writeFrame(applyPalette(data,pal,"rgb565"),gw,gh,{palette:pal,delay});
+    if(i%3===0){prog(i/n,"帧 "+(i+1)+"/"+n);await new Promise(r=>setTimeout(r,0))}
+  }
+  if(cancelExp){toast("已取消导出");gif.finish();return}
+  gif.finish();
+  const blob=new Blob([gif.bytes()],{type:"image/gif"});
+  download(blob,base+".gif");
+  toast("GIF 导出完成 · "+(blob.size/1048576).toFixed(1)+" MB");
+}
+$("#exportBtn").onclick=doExport;
+$("#exportBtn2").onclick=doExport;
+syncPlayBtn();
+</script>
+</body>
+</html>

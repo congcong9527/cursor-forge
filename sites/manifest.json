@@ -1,0 +1,18 @@
+{
+  "livepartner.fans": {
+    "json": "sites/livepartner-fans.json",
+    "png": "assets/lp-full.png"
+  },
+  "www.livepartner.fans": {
+    "json": "sites/livepartner-fans.json",
+    "png": "assets/lp-full.png"
+  },
+  "audio.livepartner.fans": {
+    "json": "sites/audio-livepartner-fans.json",
+    "png": "sites/audio-livepartner-fans.jpg"
+  },
+  "www.audio.livepartner.fans": {
+    "json": "sites/audio-livepartner-fans.json",
+    "png": "sites/audio-livepartner-fans.jpg"
+  }
+}
