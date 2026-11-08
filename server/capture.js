@@ -83,16 +83,16 @@ function extractLayout(d, host) {
     const bg = parseBg(cs.backgroundColor) || bgOf(el, d);
     const lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2];
     const mx = Math.max(bg[0], bg[1], bg[2]), mn = Math.min(bg[0], bg[1], bg[2]);
-    cand.push({ tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
+    cand.push({ _el: el, tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
       kind, detail, scene: Math.max(0, Math.floor(y / 700)),
       fs: Math.round(fs), txt: direct || (kind === "icon" ? "图标" : ""), col: cs.color || "rgb(240,240,248)",
       fw: String(cs.fontWeight || "400"), bt: bg, bb: bg, vivid: (mx - mn > 70 && lum > 90) ? 1 : 0 });
   }
   cand.sort((a, b) => a.y - b.y || b.w * b.h - a.w * a.h);
-  /* 冲突消解（向 swarm-cursors 看齐：视觉单元必须完整，不许切碎）：
-     1) 跨界切割 → 保大弃小：两框相交但互不包含（各自被切面积均超 30%）→ 丢弃小框；
-     2) 包含合并（原规则）：小框 90% 落在大框内且面积不足 72% → 丢弃。
-     处理顺序按面积从大到小，先保住完整的大元素。 */
+  /* 冲突消解 v2 —— 以真实 DOM 层级为准，不做几何猜测：
+     1) DOM 祖孙（s.contains(e)）→ 后代并入父层（面积 < 72% 丢弃）；
+     2) 非祖孙但几何交叉 → 保大弃小：小框被切 ≥35%，或被切 ≥12% 的细横条（h≤30）→ 丢弃。
+     处理顺序按面积从大到小。 */
   const interAB = (a, b) => {
     const ox = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
     const oy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
@@ -102,10 +102,14 @@ function extractLayout(d, host) {
   for (const e of cand.slice().sort((a, b) => b.w * b.h - a.w * a.h)) {
     let drop = false;
     for (const s of chosen) {
+      if (s._el && e._el && s._el.contains(e._el)) {
+        if (e.w * e.h < 0.72 * s.w * s.h) { drop = true; break }
+        continue;
+      }
       const I = interAB(e, s); if (I <= 0) continue;
       const eIn = I / (e.w * e.h), sIn = I / (s.w * s.h);
-      if (eIn > 0.90 && e.w * e.h < 0.72 * s.w * s.h) { drop = true; break }
-      if (eIn < 0.85 && sIn < 0.85 && eIn > 0.30 && sIn > 0.30) { drop = true; break }
+      if (eIn > 0.80 && e.w * e.h < 0.92 * s.w * s.h) { drop = true; break }
+      if (eIn < 0.85 && sIn < 0.85 && (eIn > 0.35 || (e.h <= 30 && eIn > 0.12))) { drop = true; break }
     }
     if (!drop) chosen.push(e);
   }
