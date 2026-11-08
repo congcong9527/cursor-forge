@@ -90,7 +90,7 @@ input[type=color]{width:34px;height:26px;border:1px solid var(--border2);border-
 <body>
 <div class="topbar">
   <span class="logo"><span class="mark"><svg viewBox="0 0 24 24" fill="white"><path d="M6 3l0 17 4.6-3.9 2.7 6.1 3.2-1.4-2.7-6.1 5.9-.7z"/></svg></span>CursorForge · 光标工厂</span>
-  <span class="ver">v3</span>
+  <span class="ver" id="verBadge">v3</span>
   <div class="urlgen">
     <input id="urlIn" type="text" placeholder="粘贴网址，自动生成搭建动效…" spellcheck="false" autocomplete="off">
     <button class="btn btn-primary" id="genBtn">生成</button>
@@ -242,6 +242,9 @@ function layerZ(b){
   return (b.detail?3:0)+(ZOF[b.kind]||2);
 }
 let seed=7;
+/* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
+const CF_VER="v3.18 · 1109h";
+console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
 
@@ -2422,6 +2425,7 @@ function drawDragBadges(t){
 /* ================= playback & controls ================= */
 generate();
 fitStage();
+$("#verBadge").textContent=CF_VER;   // 版本徽章与构建号同步
 let last=performance.now();
 function frame(now){
   const dt=Math.min((now-last)/1000,0.05);last=now;

@@ -301,19 +301,81 @@ async function capture(url) {
     }).catch(() => {});
     await sleep(250);
     await sleep(400);
+    /* 入场动画/变换压制：很多站点（如 qq.com）模块带 transform:scale / zoom 的入场态，
+       DOM 布局测量值（getBoundingClientRect 不含部分渲染态缩放）与实际光栅化结果
+       会差一个恒定比例 —— 表现为图片被切成错位切片。
+       把动画、过渡、transform、zoom 全部中和（在提取之前注入，提取与截图两端同源），
+       保证「量出来的坐标」就是「画出来的像素」。 */
+    await page.addStyleTag({
+      content: "*,*::before,*::after{animation:none!important;transition:none!important;" +
+        "transform:none!important;zoom:1!important;animation-play-state:paused!important}"
+    }).catch(() => {});
+    /* 关键修复：先让视口与「整页截图时的状态」一致，再提取布局。
+       之前顺序是「提取坐标 → captureBeyondViewport 截图」，而 captureBeyondViewport
+       会把视口临时拉成整页高，vh 布局/懒加载/容器查询会因此再排版一次，
+       坐标（排版前量的）与像素（排版后拍的）错位上百 px —— 表现就是图片被切成横向切片。
+       整页视口下懒加载还会继续注入、页高会变，所以做「视口高度收敛循环」：
+       设视口 → 等稳定 → 重测页高 → 再设视口 … 直到页高不再变化，才提取坐标、截图。 */
+    let vh = Math.max(600, Math.min(H, MAXH));
+    for (let it = 0; it < 3; it++) {
+      await page.setViewport({ width: 1280, height: vh }).catch(() => {});
+      await sleep(650);
+      await page.waitForFunction(() => {
+        const im = [...document.images];
+        return im.length === 0 || im.every(i => i.complete);
+      }, { timeout: 8000 }).catch(() => {});
+      const hN = await page.evaluate(() => Math.max(
+        document.body ? document.body.scrollHeight : 0,
+        document.documentElement ? document.documentElement.scrollHeight : 0) || 0).catch(() => 0);
+      const vhN = Math.max(600, Math.min(hN || vh, MAXH));
+      console.log("[CursorForge][conv] it=" + it + " vh=" + vh + " hN=" + hN);
+      if (Math.abs(vhN - vh) <= 4) { vh = vhN; break }
+      vh = vhN;
+    }
     /* 布局提取（与前端同源逻辑注入目标页执行） */
     const host = new URL(url).hostname.replace(/^www\./, "");
-    const data = await page.evaluate(
+    let data = await page.evaluate(
       `${parseBg};${bgOf};${extractLayout};\nextractLayout(document,${JSON.stringify(host)})`
     ).catch(e => { throw new Error("布局提取失败: " + e.message); });
     if (!data || !data.elems || !data.elems.length) throw new Error("没有解析到可见元素");
     /* 整页截图（超过 16000px 截断，与 data.docH 保持一致） */
     fs.mkdirSync(SHOT_DIR, { recursive: true });
     const h2 = Math.min(data.docH, MAXH);
-    await page.screenshot({ path: shotPath,
-      clip: { x: 0, y: 0, width: Math.min(data.vw, 1280), height: h2 },
-      captureBeyondViewport: true, type: "jpeg", quality: 82 });
-    data.docH = h2;
+    if (Math.abs(h2 - vh) > 4) {
+      /* 提取后页高仍变了（信息流继续注入）：最后对齐一次再拍 */
+      await page.setViewport({ width: 1280, height: h2 }).catch(() => {});
+      await sleep(500);
+    }
+    /* 视口已是整页高 → 用普通视口截图（所见即所量）。
+       captureBeyondViewport 内部会再做一次视口仿真/重排版，即使布局已收敛，
+       截图瞬间仍可能与提取坐标时的布局不一致。 */
+    const beyond = h2 > vh + 4;
+    /* 终极保障：有些站点（如 qq.com）会在提取之后、截图之前被自己的 JS 再渲染一次
+       （入场动画/重排版），坐标与像素就错位 —— 图片被切成横向切片。
+       做法：截图前后各提取一次坐标，指纹不一致就整轮重拍（最多 3 轮），
+       交付时永远用「紧贴截图之后的那次提取」，保证坐标与像素必然同源。 */
+    const fingerprint = d => d.elems.length + "@" + d.docH + ":" +
+      d.elems.slice(0, 60).map(e => e.x + "," + e.y + "," + e.w + "," + e.h).join(";");
+    const takeShot = () => page.screenshot({
+      clip: { x: 0, y: 0, width: Math.min(data.vw, 1280), height: Math.min(data.docH, MAXH) },
+      captureBeyondViewport: beyond, type: "jpeg", quality: 82 });
+    let buf = await takeShot();
+    let data2 = await page.evaluate(
+      `${parseBg};${bgOf};${extractLayout};\nextractLayout(document,${JSON.stringify(host)})`
+    ).catch(() => null);
+    let rounds = 0;
+    while (data2 && fingerprint(data2) !== fingerprint(data) && rounds < 2) {
+      rounds++;
+      console.log("[CursorForge] 布局在截图前后发生变化，第 " + rounds + " 轮重拍");
+      data = data2;
+      buf = await takeShot();
+      data2 = await page.evaluate(
+        `${parseBg};${bgOf};${extractLayout};\nextractLayout(document,${JSON.stringify(host)})`
+      ).catch(() => null);
+    }
+    if (data2) data = data2;   // 交付紧贴截图之后的提取
+    fs.writeFileSync(shotPath, buf);
+    data.docH = Math.min(data.docH, MAXH);
     const payload = { ok: true, host: data.host, title: data.title, desc: data.desc,
       vw: data.vw, docH: data.docH, elems: data.elems.length,
       png: pngRef, data, cached: false, ms: Date.now() - t0 };
