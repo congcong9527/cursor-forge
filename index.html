@@ -243,7 +243,7 @@ function layerZ(b){
 }
 let seed=7;
 /* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
-const CF_VER="v3.19 · 1109j";
+const CF_VER="v3.19 · 1109k";
 console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
@@ -274,6 +274,12 @@ function presets(){
       const det=!!e.detail;
       const blk=P({type:"elem",ei,kind:e.kind,detail:det,scene:e.scene||0,sel:e.sel||"",
         x:e.x*LP.k,y:e.y*LP.k,w:e.w*LP.k,h:e.h*LP.k,
+        _bgLum:(()=>{  /* 所在背景带的亮度：浅色页面用浅色层槽，避免白底上浮着黑块 */
+          const bd=(LPDATA.backs||[]).find(s=>e.y>=s.y&&e.y<s.y+s.h);
+          if(!bd)return 128;
+          const m=/(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(bd.bg||"");
+          return m?0.299*m[1]+0.587*m[2]+0.114*m[3]:128;
+        })(),
         rad:(e.r||0)*LP.k,
         crop:{sx:e.x,sy:e.y,sw:e.w,sh:e.h}});
       blk.label=det?(e.kind==="icon"?"图标":(e.txt||"文字"))
@@ -768,23 +774,27 @@ function drawDetailCover(b,x,y,opaque,alpha){
   ctx.save();ctx.globalAlpha=A;ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
   rr(ctx,x+.5,y+.5,b.w-1,b.h-1,rad);ctx.stroke();ctx.restore();
 }
-/* 黑色层槽：素材所在的「图层井」，下方透出堆叠的图层边，表现 z 深度 */
-function drawLayerWell(x,y,w,h,rad,z){
+/* 黑色层槽：素材所在的「图层井」，下方透出堆叠的图层边，表现 z 深度。
+   lum=所在背景带亮度：浅色页面上自动切换为浅色层槽，避免白底上浮着刺眼黑块 */
+function drawLayerWell(x,y,w,h,rad,z,lum){
+  const light=(lum||0)>=150;
   ctx.save();
   if(z>0&&h>8){
     for(let i=3;i>=1;i--){
       const off=i*2.3;
-      ctx.fillStyle="rgba(12,14,26,"+(0.42+i*0.13).toFixed(2)+")";
+      ctx.fillStyle=light?"rgba(219,224,238,"+(0.5+i*0.1).toFixed(2)+")"
+                         :"rgba(12,14,26,"+(0.42+i*0.13).toFixed(2)+")";
       rr(ctx,x+off*0.5,y+off,w-off,h,Math.min(rad,6));ctx.fill();
-      ctx.strokeStyle="rgba(146,160,214,"+(0.10+i*0.055).toFixed(2)+")";
+      ctx.strokeStyle=light?"rgba(105,118,158,"+(0.16+i*0.05).toFixed(2)+")"
+                            :"rgba(146,160,214,"+(0.10+i*0.055).toFixed(2)+")";
       ctx.lineWidth=1;rr(ctx,x+off*0.5+.5,y+off+.5,w-off-1,h-1,Math.min(rad,6));ctx.stroke();
     }
   }
-  ctx.fillStyle="rgba(5,6,12,.75)";rr(ctx,x,y,w,h,rad);ctx.fill();
+  ctx.fillStyle=light?"rgba(235,237,244,.95)":"rgba(5,6,12,.75)";rr(ctx,x,y,w,h,rad);ctx.fill();
   const g=ctx.createLinearGradient(0,y,0,y+Math.min(h,26));
-  g.addColorStop(0,"rgba(0,0,0,.62)");g.addColorStop(1,"rgba(0,0,0,0)");
+  g.addColorStop(0,light?"rgba(255,255,255,.9)":"rgba(0,0,0,.62)");g.addColorStop(1,"rgba(0,0,0,0)");
   ctx.fillStyle=g;rr(ctx,x,y,w,Math.min(h,26),rad);ctx.fill();
-  ctx.strokeStyle="rgba(255,255,255,.13)";ctx.lineWidth=1;
+  ctx.strokeStyle=light?"rgba(88,102,148,.28)":"rgba(255,255,255,.13)";ctx.lineWidth=1;
   rr(ctx,x+.5,y+.5,w-1,h-1,rad);ctx.stroke();
   ctx.restore();
 }
@@ -885,7 +895,7 @@ function drawBlock(b,t,th){
     const rise=easeOut(clamp((t-tIn)/Math.max(fF,0.06),0,1));
     const drop=depth*(1-rise);
     // ① 黑色层槽 + 下方堆叠的图层边
-    drawLayerWell(x,y,b.w,b.h,rad,z);
+    drawLayerWell(x,y,b.w,b.h,rad,z,b._bgLum);
     // 目标虚线框
     ctx.strokeStyle=th.skelLn;ctx.lineWidth=1;ctx.setLineDash([4,4]);
     rr(ctx,x,y,b.w,b.h,rad);ctx.stroke();ctx.setLineDash([]);
