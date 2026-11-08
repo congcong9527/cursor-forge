@@ -98,14 +98,13 @@ function extractLayout(d, host) {
     });
     if (!dup) chosen.push(e);
   }
-  /* 全局 340 上限按场景带均分配额：超长页面（如 qq.com 11597px）不再
-     「先到先得」堆满上半页、下半页全空，而是每个 700px 带均匀覆盖 */
+  /* 全局 900 上限按场景带均分配额：向 swarm-cursors 的「逐元素精准描绘、不遗漏」看齐 */
   const nSc = Math.max(1, new Set(chosen.map(e => e.scene)).size);
-  const per = Math.min(46, Math.max(12, Math.ceil(340 / nSc)));
+  const per = Math.min(80, Math.max(20, Math.ceil(900 / nSc)));
   const perScene = new Map(), elems = [];
   for (const e of chosen) {
     const n = perScene.get(e.scene) || 0;
-    if (n >= per || elems.length >= 340) continue;
+    if (n >= per || elems.length >= 900) continue;
     perScene.set(e.scene, n + 1);
     elems.push({ tag: e.tag, x: e.x, y: e.y, w: e.w, h: e.h, r: e.r, kind: e.kind, detail: e.detail,
       scene: e.scene, fs: e.fs, txt: e.txt, col: e.col, fw: e.fw, bt: e.bt, bb: e.bb, vivid: e.vivid,

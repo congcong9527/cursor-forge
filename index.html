@@ -404,16 +404,22 @@ function generate(){
          但事件终点仍精确落在元素框上，不影响标尺投影与像素级对齐。 */
       const Q=n=>rnd(seed*0.41+b.ei*7.13+n*19.7+wi*3.1+c.i*2.9);
       const jt=(n,a)=>(Q(n)*2-1)*a;
-      const fD=(short?0.18:(small?0.26:0.34))*(0.92+Q(1)*0.16);
-      const fF=(short?0.13:(small?0.22:0.30))*(0.92+Q(2)*0.16);
-      const t1=t0+fD,tIn=t1+(short?0.04:0.06),t2=tIn+fF;
+      /* 手感差异放宽（swarm-cursors 式无序感）：起手/收尾时长 ±25% 抖动 */
+      const fD=(short?0.18:(small?0.26:0.34))*(0.75+Q(1)*0.5);
+      const fF=(short?0.13:(small?0.22:0.30))*(0.75+Q(2)*0.5);
+      const t1=t0+fD,tIn=t1+(short?0.04:0.06)*(0.7+Q(27)*0.6),t2=tIn+fF;
       b._cur=c;b._wave=wi;b._tl=t0;b._t1=t1;b._tIn=tIn;b._br=t2;
       b._fDur=fD;b._fFill=fF;b._sk0=t0-(short?0.3:0.5);
-      // 从左上角按下 → 斜拉到右下角 → 回顶端 → 自上而下刷出内容 → 松手
-      const m=(short?0.16:0.26)*(0.74+Q(3)*0.52);
+      // 拉框手法每人不一样：左上→右下 / 右上→左下 / 左下→右上，随机取一
+      const m=(short?0.16:0.26)*(0.6+Q(3)*0.8);
       const o1=3+jt(4,2.2),o2=3+jt(5,2.2),o3=6+jt(6,2.6),o4=5+jt(7,2.0);
-      events.push({t:t0,c,x:bx(b)+o1,y:by(b)+o1,kind:"press",block:b,moveDur:m});
-      events.push({t:t1,c,x:bx(b)+b.w-o2,y:by(b)+b.h-o2,kind:"point",block:b,moveDur:fD,straight:true});
+      const v=Math.floor(Q(26)*3);
+      const dFrom=v===1?{x:b.w-o2,y:o1}:{x:o1,y:v===2?b.h-o2:o1};
+      const dTo=v===1?{x:o1,y:b.h-o2}:{x:b.w-o2,y:v===2?o1:b.h-o2};
+      b._dragFrom={x:bx(b)+dFrom.x,y:by(b)+dFrom.y};
+      b._dragTo={x:bx(b)+dTo.x,y:by(b)+dTo.y};
+      events.push({t:t0,c,x:bx(b)+dFrom.x,y:by(b)+dFrom.y,kind:"press",block:b,moveDur:m});
+      events.push({t:t1,c,x:bx(b)+dTo.x,y:by(b)+dTo.y,kind:"point",block:b,moveDur:fD,straight:true});
       events.push({t:tIn,c,x:bx(b)+o3,y:by(b)+o4,kind:"point",block:b,moveDur:0.05});
       events.push({t:t2,c,x:bx(b)+o3,y:by(b)+b.h-o4,kind:"release",block:b,moveDur:fF,straight:true});
       let tail=t2;
@@ -453,24 +459,47 @@ function generate(){
       finish=Math.max(finish,b._end);
       used.add(c.i);
     };
+    /* 带内乱序（swarm-cursors 式无序感）：整体仍自上而下推进，但同一水平带内
+       元素顺序确定性打乱、起手时刻随机铺开、波次节奏带抖动——像真人协作而不是阅兵 */
+    const organic=arr=>{
+      arr.sort((a,b)=>a.y-b.y||a.x-b.x);
+      const bandY=e=>Math.round(e.y/150);
+      const bands=[];
+      for(const e of arr){
+        const k=bandY(e);
+        if(!bands.length||bands[bands.length-1].k!==k)bands.push({k,list:[]});
+        bands[bands.length-1].list.push(e);
+      }
+      const out=[];
+      for(const bd of bands){
+        const L=bd.list;
+        for(let i=L.length-1;i>0;i--){
+          const j=Math.floor(rnd(seed*7.7+L[i].ei*3.13+i*1.71)*(i+1));
+          [L[i],L[j]]=[L[j],L[i]];
+        }
+        out.push(...L);
+      }
+      return out;
+    };
     const keys=[...scenes.keys()].sort((a,b)=>a-b);
     for(const sc of keys){
       const g=scenes.get(sc);
-      const S0=g.st.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
-      const D0=g.dt.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
+      const S0=organic(g.st.slice());
+      const D0=organic(g.dt.slice());
       let lastSt=wt;
       for(let i=0;i<S0.length;i+=MAXC){
         const wi=waveIdx++,ws=wt,chunk=S0.slice(i,i+MAXC);
         chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
-          ws+bi*0.045+rnd(seed*0.87+wi*13.3+bi*7.7)*0.13,false,wi));
-        wt+=1.34;lastSt=ws;
+          ws+rnd(seed*0.87+wi*13.3+bi*7.7)*0.85,false,wi));   // 起手随机铺开 0.85s
+        wt+=1.34*(0.82+rnd(seed*1.31+wi*0.73)*0.42);          // 波次节奏抖动
+        lastSt=ws;
       }
       wt=Math.max(wt,lastSt+(S0.length?1.0:0));
       for(let i=0;i<D0.length;i+=MAXC){
         const wi=waveIdx++,ws=wt,chunk=D0.slice(i,i+MAXC);
         chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
-          ws+bi*0.035+rnd(seed*0.91+wi*17.1+bi*5.9)*0.11,true,wi));
-        wt+=0.9;
+          ws+rnd(seed*0.91+wi*17.1+bi*5.9)*0.8,true,wi));
+        wt+=0.9*(0.78+rnd(seed*2.17+wi*0.53)*0.44);
       }
       wt+=0.16;
     }
@@ -2359,7 +2388,10 @@ function drawDragBadges(t){
     if(a===undefined||wEnd===undefined||wEnd-a<0.08)continue;
     if(t<a||t>wEnd+0.03)continue;
     const u=easeOut(clamp((t-a)/(wEnd-a),0,1));
-    const w2=b.w*u,h2=b.h*u,x0=bx(b),y0=by(b);
+    const F0=b._dragFrom||{x:bx(b),y:by(b)},T0=b._dragTo||{x:bx(b)+b.w,y:by(b)+b.h};
+    const cx1=F0.x+(T0.x-F0.x)*u,cy1=F0.y+(T0.y-F0.y)*u;
+    const x0=Math.min(F0.x,cx1),y0=Math.min(F0.y,cy1);
+    const w2=Math.abs(cx1-F0.x),h2=Math.abs(cy1-F0.y);
     ctx.save();
     ctx.globalAlpha=0.9;
     ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1.2;ctx.setLineDash([4,4]);
@@ -2372,7 +2404,7 @@ function drawDragBadges(t){
     const label=Math.round(w2)+" × "+Math.round(h2);
     ctx.font="600 11px Inter,'JetBrains Mono',monospace";
     const tw2=ctx.measureText(label).width;
-    const px2=Math.min(x0+w2+12,W-tw2-26),py2=Math.max(14,y0+h2-4);
+    const px2=Math.max(4,Math.min(cx1+12,W-tw2-26)),py2=Math.max(14,cy1-4);
     ctx.fillStyle=c.color;rr(ctx,px2,py2-9,tw2+14,19,4);ctx.fill();
     ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="middle";
     ctx.fillText(label,px2+7,py2+0.5);
@@ -2702,14 +2734,14 @@ function extractLayout(d,host){
     });
     if(!dup)chosen.push(e);
   }
-  /* 全局 340 上限按场景带均分配额：超长页面（如 qq.com 11597px）不再
-     「先到先得」堆满上半页、下半页全空，而是每个 700px 带均匀覆盖 */
+  /* 全局 900 上限按场景带均分配额：向 swarm-cursors 的「逐元素精准描绘、不遗漏」看齐。
+     超长页面（如 qq.com 11597px）每个 700px 带均匀覆盖，小图标/小文字也逐个入选 */
   const nSc=Math.max(1,new Set(chosen.map(e=>e.scene)).size);
-  const per=Math.min(46,Math.max(12,Math.ceil(340/nSc)));
+  const per=Math.min(80,Math.max(20,Math.ceil(900/nSc)));
   const perScene=new Map(),elems=[];
   for(const e of chosen){
     const n=perScene.get(e.scene)||0;
-    if(n>=per||elems.length>=340)continue;
+    if(n>=per||elems.length>=900)continue;
     perScene.set(e.scene,n+1);
     elems.push({tag:e.tag,x:e.x,y:e.y,w:e.w,h:e.h,r:e.r,kind:e.kind,detail:e.detail,
       scene:e.scene,fs:e.fs,txt:e.txt,col:e.col,fw:e.fw,bt:e.bt,bb:e.bb,vivid:e.vivid,
