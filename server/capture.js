@@ -89,14 +89,25 @@ function extractLayout(d, host) {
       fw: String(cs.fontWeight || "400"), bt: bg, bb: bg, vivid: (mx - mn > 70 && lum > 90) ? 1 : 0 });
   }
   cand.sort((a, b) => a.y - b.y || b.w * b.h - a.w * a.h);
+  /* 冲突消解（向 swarm-cursors 看齐：视觉单元必须完整，不许切碎）：
+     1) 跨界切割 → 保大弃小：两框相交但互不包含（各自被切面积均超 30%）→ 丢弃小框；
+     2) 包含合并（原规则）：小框 90% 落在大框内且面积不足 72% → 丢弃。
+     处理顺序按面积从大到小，先保住完整的大元素。 */
+  const interAB = (a, b) => {
+    const ox = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+    const oy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    return ox * oy;
+  };
   const chosen = [];
-  for (const e of cand) {
-    const dup = chosen.some(s => {
-      const ox = Math.max(0, Math.min(e.x + e.w, s.x + s.w) - Math.max(e.x, s.x));
-      const oy = Math.max(0, Math.min(e.y + e.h, s.y + s.h) - Math.max(e.y, s.y));
-      return ox * oy / Math.max(1, e.w * e.h) > 0.90 && e.w * e.h > 0.72 * (s.w * s.h);
-    });
-    if (!dup) chosen.push(e);
+  for (const e of cand.slice().sort((a, b) => b.w * b.h - a.w * a.h)) {
+    let drop = false;
+    for (const s of chosen) {
+      const I = interAB(e, s); if (I <= 0) continue;
+      const eIn = I / (e.w * e.h), sIn = I / (s.w * s.h);
+      if (eIn > 0.90 && e.w * e.h < 0.72 * s.w * s.h) { drop = true; break }
+      if (eIn < 0.85 && sIn < 0.85 && eIn > 0.30 && sIn > 0.30) { drop = true; break }
+    }
+    if (!drop) chosen.push(e);
   }
   /* 全局 900 上限按场景带均分配额：向 swarm-cursors 的「逐元素精准描绘、不遗漏」看齐 */
   const nSc = Math.max(1, new Set(chosen.map(e => e.scene)).size);
