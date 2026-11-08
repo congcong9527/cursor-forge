@@ -243,7 +243,7 @@ function layerZ(b){
 }
 let seed=7;
 /* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
-const CF_VER="v3.18 · 1109i";
+const CF_VER="v3.19 · 1109j";
 console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
@@ -2703,6 +2703,8 @@ function bgOf(el,d){
 function extractLayout(d,host){
   const win=d.defaultView;
   const vw=Math.max(320,Math.min(2200,Math.round(d.documentElement.scrollWidth||1280)));
+  /* 截图实际宽度：坐标一律按 capW 裁剪，横向溢出的元素不去截图外取像素 */
+  const capW=Math.min(vw,1280);
   const docH=Math.max(600,Math.min(16000,Math.round(Math.max(
     d.body.scrollHeight,d.documentElement.scrollHeight,d.body.getBoundingClientRect().height)||900)));
   const skip=new Set(["script","style","noscript","iframe","svg","path","br","hr","meta","link","head","title","option","source","picture"]);
@@ -2732,9 +2734,9 @@ function extractLayout(d,host){
     const r=el.getBoundingClientRect();let w=r.width;const h=r.height;
     if(w<12||h<10||w>vw*1.5||h>docH)continue;
     let x=Math.round(r.left+win.scrollX),y=Math.round(r.top+win.scrollY);
-    /* 横向越界裁剪：超宽 banner（如 qq.com 的 1600px 横幅）不许画出画布 */
+    /* 横向越界裁剪：按截图实际宽度 capW 裁，超出部分不画 */
     if(x<0){w+=x;x=0}
-    if(x+w>vw)w=vw-x;
+    if(x+w>capW)w=capW-x;
     if(w<12)continue;
     if(y<-200||y>docH+200)continue;
     const direct=[...el.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim())
@@ -2782,6 +2784,7 @@ function extractLayout(d,host){
   for(const e of cand.slice().sort((a,b)=>b.w*b.h-a.w*b.h)){
     let drop=false;
     for(const s of chosen){
+      if(s.x===e.x&&s.y===e.y&&s.w===e.w&&s.h===e.h){drop=true;break}  // 完全重复矩形去重
       if(s._el&&e._el&&s._el.contains(e._el)){
         if(e.w*e.h<0.72*s.w*s.h){drop=true;break}
         continue;                                    // 祖先后代不按几何切割论处
@@ -2830,7 +2833,7 @@ function extractLayout(d,host){
     backs.push({y,h:Math.min(step,docH-y),bg:"rgb("+c.join(",")+")"});
   }
   const metaEl=d.querySelector('meta[name="description"],meta[property="og:description"]');
-  return {vw,docH,backs,elems,host:host||"自定义站点",
+  return {vw:capW,docH,backs,elems,host:host||"自定义站点",
     title:(d.title||"").replace(/\s+/g," ").trim().slice(0,60),
     desc:String((metaEl&&metaEl.getAttribute("content"))||"").replace(/\s+/g," ").trim().slice(0,120)};
 }

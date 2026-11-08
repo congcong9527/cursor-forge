@@ -50,6 +50,9 @@ function bgOf(el, d) {
 function extractLayout(d, host) {
   const win = d.defaultView;
   const vw = Math.max(320, Math.min(2200, Math.round(d.documentElement.scrollWidth || 1280)));
+  /* 截图实际宽度：clip 上限 1280。元素坐标一律按 capW 裁剪，
+     否则横向溢出的元素（坐标 > 1280）会去截图外取像素 —— 右侧整列照片被切断 */
+  const capW = Math.min(vw, 1280);
   const docH = Math.max(600, Math.min(16000, Math.round(Math.max(
     d.body.scrollHeight, d.documentElement.scrollHeight, d.body.getBoundingClientRect().height) || 900)));
   const skip = new Set(["script", "style", "noscript", "iframe", "svg", "path", "br", "hr", "meta", "link", "head", "title", "option", "source", "picture"]);
@@ -79,9 +82,9 @@ function extractLayout(d, host) {
     const r = el.getBoundingClientRect();let w = r.width;const h = r.height;
     if (w < 12 || h < 10 || w > vw * 1.5 || h > docH) continue;
     let x = Math.round(r.left + win.scrollX), y = Math.round(r.top + win.scrollY);
-    /* 横向越界裁剪：超宽 banner（如 qq.com 的 1600px 横幅）不许画出画布 */
+    /* 横向越界裁剪：按截图实际宽度 capW 裁，超出部分不画 */
     if (x < 0) { w += x; x = 0; }
-    if (x + w > vw) w = vw - x;
+    if (x + w > capW) w = capW - x;
     if (w < 12) continue;
     if (y < -200 || y > docH + 200) continue;
     const direct = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim())
@@ -127,6 +130,7 @@ function extractLayout(d, host) {
   for (const e of cand.slice().sort((a, b) => b.w * b.h - a.w * a.h)) {
     let drop = false;
     for (const s of chosen) {
+      if (s.x === e.x && s.y === e.y && s.w === e.w && s.h === e.h) { drop = true; break }
       if (s._el && e._el && s._el.contains(e._el)) {
         if (e.w * e.h < 0.72 * s.w * s.h) { drop = true; break }
         continue;
@@ -174,7 +178,7 @@ function extractLayout(d, host) {
     backs.push({ y, h: Math.min(step, docH - y), bg: "rgb(" + c.join(",") + ")" });
   }
   const metaEl = d.querySelector('meta[name="description"],meta[property="og:description"]');
-  return { vw, docH, backs, elems, host: host || "自定义站点",
+  return { vw: capW, docH, backs, elems, host: host || "自定义站点",
     title: (d.title || "").replace(/\s+/g, " ").trim().slice(0, 60),
     desc: String((metaEl && metaEl.getAttribute("content")) || "").replace(/\s+/g, " ").trim().slice(0, 120) };
 }
@@ -316,14 +320,12 @@ async function captureOnce(url, strict) {
     }).catch(() => {});
     await sleep(250);
     await sleep(400);
-    /* 入场动画/变换压制：很多站点（如 qq.com）模块带 transform:scale / zoom 的入场态，
-       DOM 布局测量值（getBoundingClientRect 不含部分渲染态缩放）与实际光栅化结果
-       会差一个恒定比例 —— 表现为图片被切成错位切片。
-       把动画、过渡、transform、zoom 全部中和（在提取之前注入，提取与截图两端同源），
-       保证「量出来的坐标」就是「画出来的像素」。 */
+    /* 入场动画/zoom 中和：旧版 Chrome 的 CSS zoom 不影响 getBoundingClientRect，
+       量出的是缩放前坐标、画出的是缩放后像素，差一个恒定比例 —— 图片被切成错位切片。
+       只中和 zoom 与动画/过渡；不能动 transform（轮播靠 transform 定位，
+       transform:none 会让所有轮播图排成一行、页面横向溢出，第三列照片被截图边缘切断）。 */
     await page.addStyleTag({
-      content: "*,*::before,*::after{animation:none!important;transition:none!important;" +
-        "transform:none!important;zoom:1!important;animation-play-state:paused!important}"
+      content: "*,*::before,*::after{animation:none!important;transition:none!important;zoom:1!important}"
     }).catch(() => {});
     /* 关键修复：先让视口与「整页截图时的状态」一致，再提取布局。
        之前顺序是「提取坐标 → captureBeyondViewport 截图」，而 captureBeyondViewport
