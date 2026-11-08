@@ -101,6 +101,7 @@ input[type=color]{width:34px;height:26px;border:1px solid var(--border2);border-
   <span class="spacer"></span>
   <input type="file" id="packIn" accept=".json,.png,.html,.htm,application/json,image/png,text/html" multiple hidden>
   <button class="icon-btn" id="playBtn" title="播放/暂停（空格）"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+  <button class="icon-btn" id="sndBtn" title="静音（M）"></button>
   <button class="icon-btn" id="restartBtn" title="回到开头"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5v14M18 5l-9 7 9 7z"/></svg></button>
   <button class="btn" id="shuffleBtn">重新编排</button>
   <button class="btn btn-primary" id="exportBtn2">导出</button>
@@ -143,6 +144,8 @@ input[type=color]{width:34px;height:26px;border:1px solid var(--border2);border-
       <div class="ctl"><div class="row"><span>动效速度</span><span class="val" id="v_speed"></span></div>
         <input type="range" id="r_speed" min="0.5" max="2" step="0.05" value="1"></div>
       <label class="chk"><input type="checkbox" id="c_names" checked>显示光标名字牌</label>
+      <label class="chk"><input type="checkbox" id="c_sound" checked>合成音效（打字 / 成型音符 / 收尾和弦）</label>
+      <label class="chk"><input type="checkbox" id="c_flock" checked>播完后光标群跟随鼠标</label>
     </section>
     <section><h6>导出</h6>
       <div class="ctl"><div class="segw" id="fmtSeg"><button data-v="mp4" class="on">MP4</button><button data-v="webm">WebM</button><button data-v="gif">GIF</button><button data-v="png">PNG</button></div></div>
@@ -244,7 +247,7 @@ const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc
 
 const S={preset:"lp",title:"让产品发布快人一步",accent:"#6c5cff",theme:"dark",
   skel:true,confetti:true,nCur:24,speed:1,names:true,
-  cam:true,trail:true,guides:true,spark:true,
+  cam:true,trail:true,guides:true,spark:true,sound:true,flock:true,
   fmt:"mp4",fps:30,playing:true,clock:0};
 let script=null,evsByCursor=[],intro=null;
 
@@ -509,6 +512,7 @@ function generate(){
       events.push({t:tG,c,x:cx2,y:cy2,kind:"grab",block:b,moveDur:0.3});
       events.push({t:tN,c,x:cx2+ndx,y:cy2+ndy,kind:"nudge",block:b,moveDur:0.32,straight:true});
       events.push({t:tR,c,x:cx2,y:cy2,kind:"ungrab",block:b,moveDur:0.32,straight:true});
+      b._cur=c;                                          // 供光标形态窗口/尺寸徽章使用
       b._tl=tPress;b._br=tRelease;b._drag=drag;
       b._sk0=tPress-1.15;                              // 骨架框开始被描出的时刻
       b._adj={t2:tG,t3:tN,t4:tR,dx:ndx,dy:ndy};
@@ -583,6 +587,50 @@ function generate(){
     if(isPage()){c.x=LP.x+LP.w*(0.16+(c.i%6)*0.135);c.y=70+Math.floor(c.i/6)*32}
     else{c.x=-120-rnd(c.i*3)*300;c.y=rnd(c.i*5)*H}
   }
+  /* 光标形态窗口（Figma 式）：拉框画块 = 十字准星，打字 = 工字梁。确定性窗口，导出一致 */
+  for(const b of blocks){
+    const c=b._cur;if(!c)continue;
+    const isDrag=isPage()?b._tl!==undefined&&b._t1!==undefined:b._tl!==undefined&&b._br!==undefined;
+    if(isDrag)(c.modes=c.modes||[]).push({a:(isPage()?b._tl:b._tl)-0.1,b:(isPage()?b._t1:b._br)+0.05,s:"cross"});
+    if(b._txt)(c.modes=c.modes||[]).push({a:b._txt.t0-0.14,b:b._txt.td+0.06,s:"ibeam"});
+  }
+  /* 音效事件表：全部从确定性时间轴派生，播放时前瞻调度（见 SwarmSound） */
+  script.sfx=buildSfx(blocks);
+}
+
+/* ================= 合成音效事件表 =================
+   致谢 swarm-cursors（DhvanilPatel/swarm-cursors，动作设计源自 Joel Califa 的 Swarm）：
+   玻璃钢琴 = E 大调五声音阶，元素成型即一个音符 —— 面积越大音越低、越靠右音级越高、
+   声像跟随横向位置；打字是机械键盘 clack，按下/抓取是纸感 click；
+   开场空气 swell，光标散开琶音，收尾 E 大调加九和弦。全部 Web Audio 实时合成，无音频文件。 */
+function buildSfx(blocks){
+  const evs=[];
+  evs.push({t:isPage()&&intro?0.30:0.35,f:"swell"});
+  evs.push({t:isPage()&&intro?intro.build0-0.05:0.95,f:"arp"});
+  for(const e of script.events){
+    if(e.kind==="press"&&!e.txtEv&&!e.bandEv)evs.push({t:e.t,f:"press",x:e.x,y:e.y});
+    else if(e.kind==="grab")evs.push({t:e.t,f:"grab",x:e.x,y:e.y});
+    else if(e.kind==="release"&&!e.txtEv&&e.block)
+      evs.push({t:e.t+0.02,f:"place",kind:e.block.img?"image":"rect",
+        x:bx(e.block)+e.block.w/2,y:by(e.block)+e.block.h/2,w:e.block.w,h:e.block.h});
+    else if(e.bandEv&&e.kind==="point"&&e.block&&e.x>bx(e.block)+e.block.w*0.6)
+      evs.push({t:e.t+0.02,f:"place",kind:"rect",x:bx(e.block)+e.block.w/2,y:by(e.block)+e.block.h/2,
+        w:e.block.w,h:e.block.h,big:1});
+  }
+  for(const b of blocks){                                   /* 打字 = 按时距抖动的键盘 clack 序列 */
+    if(!b._txt)continue;
+    const t0=b._txt.t0,td=b._txt.td,dur=td-t0;
+    const n=Math.max(3,Math.round(dur/0.028));
+    for(let k=0;k<n;k++){
+      const u=(k+rnd(seed*3.1+(b.ei||0)*5.7+k*1.7)*0.5)/n;
+      evs.push({t:t0+dur*u,f:"key",x:bx(b)+b.w*0.4,y:by(b)+b.h*0.5,
+        sp:rnd(seed+(b.ei||0)*9.7+k*3.3)<0.14?1:0});
+    }
+  }
+  evs.push({t:isPage()&&intro?intro.card0+0.05:script.duration-1.75,f:"chord"});
+  if(isPage()&&intro)evs.push({t:intro.review0+0.1,f:"sweep"});
+  evs.sort((a,b)=>a.t-b.t);
+  return evs;
 }
 
 /* 细节占位块的出现时机：
@@ -1539,15 +1587,25 @@ function bezier(x0,y0,x1,y1,u,c,ei,e){
 }
 const trails={};
 function drawCursor(c,t,th,now){
-  const uiA=pageUiAlpha(t);
+  const uiA=FLOCK.on?1:pageUiAlpha(t);
   if(uiA<=0)return;                            // 成品巡览：光标全部退场
   const evs=evsByCursor[c.i]||[];
-  if(!evs.length&&!isPage())return;
-  if(t<(c.join||0))return;                     // 还没进场
-  const jk=clamp((t-(c.join||0))/0.28,0,1);    // 进场淡入
-  const first=evs[0];
-  if(!inCeremony(t)&&first&&t<first.t-(first.moveDur||0.6)-0.2)return;
-  const p=cursorPos(c,t);
+  if(!FLOCK.on){
+    if(!evs.length&&!isPage())return;
+    if(t<(c.join||0))return;                   // 还没进场
+    const first=evs[0];
+    if(!inCeremony(t)&&first&&t<first.t-(first.moveDur||0.6)-0.2)return;
+  }
+  let p;
+  if(FLOCK.on){
+    const f=FLOCK.cs.find(q=>q.c===c);
+    if(!f)return;
+    p={x:f.x,y:f.y};
+  }else p=cursorPos(c,t);
+  /* 形态：拉框=十字准星，打字=工字梁（Figma 式），其余=箭头 */
+  let mode="arrow";
+  if(!FLOCK.on&&c.modes)for(const m of c.modes){if(t>=m.a&&t<=m.b){mode=m.s;break}}
+  const jk=FLOCK.on?1:clamp((t-(c.join||0))/0.28,0,1);    // 进场淡入
   const P=c._p||{tw:0.28,tline:3,tilt:0,size:1,bounce:0.28};
   if(S.trail){
     /* now 是 rAF 的毫秒时间戳，拖尾窗口必须换算成毫秒；
@@ -1577,10 +1635,32 @@ function drawCursor(c,t,th,now){
   ctx.globalAlpha=jk*uiA;
   const sc=1.4*P.size*cs*(0.62+0.38*jk);
   ctx.scale(sc,sc);
-  ctx.beginPath();
-  ctx.moveTo(0,0);ctx.lineTo(0,17);ctx.lineTo(4.6,13.2);ctx.lineTo(7.4,19);ctx.lineTo(10,17.6);ctx.lineTo(7.3,11.9);ctx.lineTo(12.6,11.4);ctx.closePath();
-  ctx.fillStyle=c.color;ctx.fill();
-  ctx.strokeStyle="rgba(255,255,255,.95)";ctx.lineWidth=1.6;ctx.stroke();
+  if(mode==="cross"){                          // 十字准星：白芯彩边（Figma 式）
+    ctx.lineCap="round";
+    ctx.lineWidth=3.6;ctx.strokeStyle="rgba(255,255,255,.95)";
+    ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(0,9);ctx.moveTo(-9,0);ctx.lineTo(9,0);ctx.stroke();
+    ctx.lineWidth=1.5;ctx.strokeStyle=c.color;
+    ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(0,9);ctx.moveTo(-9,0);ctx.lineTo(9,0);ctx.stroke();
+  }else if(mode==="ibeam"){                    // 工字梁：打字位
+    ctx.lineCap="round";
+    ctx.lineWidth=3.4;ctx.strokeStyle="rgba(255,255,255,.95)";
+    ctx.beginPath();
+    ctx.moveTo(0,-8);ctx.lineTo(0,8);
+    ctx.moveTo(-3.6,-8);ctx.lineTo(-1.2,-8);ctx.moveTo(1.2,-8);ctx.lineTo(3.6,-8);
+    ctx.moveTo(-3.6,8);ctx.lineTo(-1.2,8);ctx.moveTo(1.2,8);ctx.lineTo(3.6,8);
+    ctx.stroke();
+    ctx.lineWidth=1.5;ctx.strokeStyle=c.color;
+    ctx.beginPath();
+    ctx.moveTo(0,-8);ctx.lineTo(0,8);
+    ctx.moveTo(-3.6,-8);ctx.lineTo(-1.2,-8);ctx.moveTo(1.2,-8);ctx.lineTo(3.6,-8);
+    ctx.moveTo(-3.6,8);ctx.lineTo(-1.2,8);ctx.moveTo(1.2,8);ctx.lineTo(3.6,8);
+    ctx.stroke();
+  }else{
+    ctx.beginPath();
+    ctx.moveTo(0,0);ctx.lineTo(0,17);ctx.lineTo(4.6,13.2);ctx.lineTo(7.4,19);ctx.lineTo(10,17.6);ctx.lineTo(7.3,11.9);ctx.lineTo(12.6,11.4);ctx.closePath();
+    ctx.fillStyle=c.color;ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.95)";ctx.lineWidth=1.6;ctx.stroke();
+  }
   ctx.restore();
   if(S.names&&!inCeremony(t)){                 // 仪式编队只留光标，密集队形不被名字糊住
     ctx.save();ctx.globalAlpha=jk*uiA;
@@ -1783,6 +1863,7 @@ function render(t,dt,now){
     drawTitleCard(t);                        // 片头字幕：文字在光标层之下，笔尖压字拖出
     ctx.restore();
     for(const c of script.cursors)drawCursor(c,t,th,now);
+    drawDragBadges(t);
   }else{
     drawChrome(th);
     ctx.save();
@@ -1791,6 +1872,7 @@ function render(t,dt,now){
     drawEffects(t);
     ctx.restore();
     for(const c of script.cursors)drawCursor(c,t,th,now);
+    drawDragBadges(t);
   }
   ctx.restore();
   if(isPage())drawIntroLogo(t);              // 开场绕场：中央品牌 Logo
@@ -2027,24 +2109,300 @@ function drawUrlBar(th,alpha){
   ctx.restore();
 }
 
+/* ================= SwarmSound：Web Audio 合成音效引擎 =================
+   移植自 swarm-cursors 的 Sound 类（玻璃钢琴/机械键盘/click/混响全部合成）。
+   时间轴是确定性的，音效事件在 generate() 里预计算成 script.sfx；
+   播放时前瞻 0.22s 调度，暂停/拖动进度/倍速变化都会重定位，声画永远对齐。 */
+const PENTA=[0,2,4,7,9],E2=40;                   // E F# G# B C#
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+class SwarmSound{
+  constructor(){this.on=S.sound;this.ctx=null;this.live=[];this.slots=new Map();
+    this.keyT=[];this.pressT=[];this.bpm=104;this.ck=-1;this.ix=0;this.arm=false}
+  ensure(){                                       // 必须由用户手势触发
+    if(this.ctx){if(this.ctx.state==="suspended")this.ctx.resume().catch(()=>{});return}
+    try{this.ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"})}catch(e){return}
+    const c=this.ctx;
+    this.out=c.createGain();this.out.gain.value=this.on?1:0;this.out.connect(c.destination);
+    const comp=c.createDynamicsCompressor();
+    comp.threshold.value=-18;comp.knee.value=14;comp.ratio.value=5;
+    comp.attack.value=0.003;comp.release.value=0.3;
+    this.master=c.createGain();this.master.gain.value=0.9;
+    this.master.connect(comp);comp.connect(this.out);
+    this.verb=c.createConvolver();this.verb.buffer=this.impulse(2.2,2.2);
+    const wet=c.createGain();wet.gain.value=0.45;this.verb.connect(wet);wet.connect(this.master);
+    this.noiseBuf=this.noise(1.2);
+  }
+  impulse(secs,decay){                            // 程序生成的房间混响
+    const sr=this.ctx.sampleRate,n=Math.floor(sr*secs),b=this.ctx.createBuffer(2,n,sr);
+    for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;
+      for(let i=0;i<n;i++){const k=i/n,a=0.55-0.4*k;
+        lp+=a*((Math.random()*2-1)-lp);
+        d[i]=lp*Math.pow(1-k,decay)*(i<sr*0.012?i/(sr*0.012):1)}}
+    return b;
+  }
+  noise(secs){const sr=this.ctx.sampleRate,b=this.ctx.createBuffer(1,Math.floor(sr*secs),sr),
+    d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b}
+  setOn(v){this.on=v;if(this.ctx){const t=this.ctx.currentTime;
+    this.out.gain.cancelScheduledValues(t);
+    this.out.gain.setTargetAtTime(v?1:0,t,0.05);if(v)this.ensure()}}
+  pan(x){return Math.max(-0.8,Math.min(0.8,x/Math.max(1,W)*1.6-0.8))}
+  bus(when,pan,send){const g=this.ctx.createGain(),p=this.ctx.createStereoPanner();
+    p.pan.setValueAtTime(pan,when);g.connect(p);p.connect(this.master);
+    if(send){const s=this.ctx.createGain();s.gain.value=send;p.connect(s);s.connect(this.verb)}
+    return g}
+  reg(when,len,stop){this.live.push({until:when+len,stop});this.prune()}
+  prune(){const now=this.ctx?this.ctx.currentTime:0;
+    this.live=this.live.filter(v=>{if(v.until<now-0.3){try{v.stop(0)}catch(e){}return false}return true})}
+  killAll(){for(const v of this.live){try{v.stop(0)}catch(e){}}this.live=[]}
+  tick(when,pan,freq,q,vel,len){const c=this.ctx,src=c.createBufferSource();
+    src.buffer=this.noiseBuf;const bp=c.createBiquadFilter();
+    bp.type="bandpass";bp.frequency.value=freq;bp.Q.value=q;
+    const g=this.bus(when,pan,0.06);
+    g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(vel,when+0.0008);
+    g.gain.exponentialRampToValueAtTime(0.0004,when+len);
+    src.connect(bp);bp.connect(g);src.start(when,Math.random()*0.8);src.stop(when+len+0.02);
+    this.reg(when,len+0.05,()=>src.stop)}
+  clack(when,pan,space){                           // 机械键盘：高频 click + 短 thock
+    this.tick(when,pan,3600+Math.random()*2000,2.2,(0.2+Math.random()*0.1),0.006+Math.random()*0.005);
+    this.tick(when+Math.random()*0.004,pan,space?380+Math.random()*180:850+Math.random()*650,1.6,
+      (space?0.26:0.13+Math.random()*0.07),space?0.065:0.025+Math.random()*0.017)}
+  piano(midi,when,vel,pan,ring=2.4){               // 玻璃钢琴：正弦分音 + 非谐玻璃泛音
+    const c=this.ctx,f=mtof(midi),v=this.bus(when,pan,0.85);
+    v.gain.value=0.3*vel;
+    const hi=f>900,parts=[[1,1,1],[2,0.38,0.55],[3,0.12,0.32],[2.756,0.16,0.42],[5.4,0.05,0.16]];
+    const oscs=[];
+    for(const[r,a,d]of parts){
+      if(f*r>15000)continue;
+      const o=c.createOscillator();o.type="sine";
+      o.frequency.value=f*r*(1+(Math.random()-0.5)*0.002);
+      const g=c.createGain(),dec=ring*d*(hi?0.65:1);
+      g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(a,when+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0006,when+dec);
+      o.connect(g);g.connect(v);o.start(when);o.stop(when+dec+0.05);oscs.push(o);
+    }
+    this.reg(when,ring+0.2,()=>oscs.forEach(o=>{try{o.stop(0)}catch(e){}}));
+  }
+  grid(when,div=2){const step=60/this.bpm/div;
+    const k=Math.ceil((when-this.t0g)/step);return this.t0g+k*step}
+  fire(ev,when){                                   // 调度一个音效事件
+    const c=this.ctx,pan=this.pan(ev.x||W/2);
+    switch(ev.f){
+      case "press":
+        this.tick(when+0.004,pan,2100+Math.random()*600,4,0.32,0.012);
+        this.tick(when+0.005,pan,650+Math.random()*200,2,0.16,0.022);
+        this.tick(when+0.062,pan,2900+Math.random()*500,4,0.15,0.008);break;
+      case "grab":
+        this.tick(when+0.004,pan,2400+Math.random()*500,3,0.2,0.01);
+        this.tick(when+0.006,pan,700+Math.random()*150,2,0.12,0.02);break;
+      case "key":{                                 // 打字：24ms 节流 + 每秒 80 键上限
+        if(when-(this.lastK||0)<0.024)break;
+        this.keyT=this.keyT.filter(k=>when-k<1);
+        if(this.keyT.length>80)break;
+        this.lastK=when;this.keyT.push(when);
+        this.clack(when+0.004,pan,ev.sp);break}
+      case "place":{                               // 成型 = 五声音阶玻璃钢琴音符
+        const area=(ev.w*ev.h)/Math.max(1,(isPage()?LP.w*900:W*H));
+        const oct=ev.big?1:area>0.08?1:area>0.015?2:area>0.002?3:4;
+        const deg=Math.floor(Math.max(0,Math.min(0.999,(ev.x||0)/Math.max(1,W)))*5);
+        const midi=E2+oct*12+PENTA[deg];
+        const step=60/this.bpm/2,k=Math.ceil((when-this.t0g)/step);
+        const q=this.t0g+k*step,slot="2:"+k;
+        const seen=this.slots.get(slot)||[];
+        if(seen.length>=1)break;
+        seen.push(midi);this.slots.set(slot,seen);
+        if(this.slots.size>64)this.slots.delete(this.slots.keys().next().value);
+        const ring=oct<=1?3.6:oct>=4?1.6:2.4;
+        this.piano(midi,q,ev.kind==="image"?0.26:0.23,pan,ring);
+        if(ev.kind==="image")this.piano(midi+7,q+0.04,0.14,pan,ring);break}
+      case "swell":{                               // 开场：空气 swell + 低音开放五度
+        const src=c.createBufferSource();src.buffer=this.noiseBuf;src.loop=true;
+        const bp=c.createBiquadFilter();bp.type="bandpass";bp.Q.value=0.8;
+        bp.frequency.setValueAtTime(260,when);
+        bp.frequency.exponentialRampToValueAtTime(2400,when+0.9);
+        bp.frequency.exponentialRampToValueAtTime(900,when+1.8);
+        const g=this.bus(when,0,0.6);
+        g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(0.14,when+0.7);
+        g.gain.exponentialRampToValueAtTime(0.0005,when+2.1);
+        src.connect(bp);bp.connect(g);src.start(when);src.stop(when+2.2);
+        this.reg(when,2.3,()=>src.stop);
+        [[E2,0],[E2+7,0.08],[E2+12,0.16]].forEach(([m,d])=>this.pad(m,when+0.3+d,0.06,2.4));break}
+      case "arp":                                  // 光标散开：E 琶音
+        [E2+24,E2+28,E2+31,E2+36,E2+40].forEach((m,i)=>this.piano(m,when+i*0.14,0.18,-0.5+i*0.25,2));break;
+      case "chord":{                               // 收尾：E 大调加九和弦分解扫入
+        const chord=[E2,E2+7,E2+12,E2+16,E2+19,E2+26,E2+28,E2+31,E2+36,E2+43];
+        chord.forEach((m,i)=>this.piano(m,when+i*0.035,0.34-i*0.015,-0.6+(i/chord.length)*1.2,5.5));
+        this.pad(E2+12,when,0.05,5);break}
+      case "sweep":{                               // 成品结晶：下落 sweep
+        const src=c.createBufferSource();src.buffer=this.noiseBuf;src.loop=true;
+        const bp=c.createBiquadFilter();bp.type="bandpass";bp.Q.value=1;
+        bp.frequency.setValueAtTime(3000,when);
+        bp.frequency.exponentialRampToValueAtTime(220,when+1);
+        const g=this.bus(when,0,0.5);
+        g.gain.setValueAtTime(0.1,when);g.gain.exponentialRampToValueAtTime(0.0005,when+1.1);
+        src.connect(bp);bp.connect(g);src.start(when);src.stop(when+1.2);
+        this.reg(when,1.3,()=>src.stop);
+        this.piano(E2+12,when+0.05,0.26,0,2.5);break}
+    }
+  }
+  pad(midi,when,vel,len){const c=this.ctx,g=this.bus(when,0,0.9);
+    g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(vel,when+len*0.4);
+    g.gain.exponentialRampToValueAtTime(0.0005,when+len);
+    const oscs=[];
+    for(const det of[-4,4]){const o=c.createOscillator();o.type="triangle";
+      o.frequency.value=mtof(midi);o.detune.value=det;o.connect(g);o.start(when);o.stop(when+len+0.05);oscs.push(o)}
+    this.reg(when,len+0.2,()=>oscs.forEach(o=>{try{o.stop(0)}catch(e){}}));
+  }
+  reset(){this.killAll();this.slots.clear();this.keyT=[];this.pressT=[];this.lastK=0;
+    const evs=script.sfx||[];let i=0;while(i<evs.length&&evs[i].t<S.clock-0.001)i++;this.ix=i}
+  sync(clock,playing,speed){
+    if(!this.ctx||!this.on||!script||!script.sfx)return;
+    if(!playing){this.ck=clock;this.arm=false;return}
+    if(this.ctx.state!=="running"){this.ck=clock;this.arm=false;return} // 挂起时不调度，恢复后续播
+    if(!this.arm||clock<this.ck-0.05||clock-this.ck>0.5)this.reset();  // seek/循环/重排
+    this.arm=true;this.ck=clock;
+    this.t0g=this.t0g==null?this.ctx.currentTime+0.05:this.t0g;
+    const evs=script.sfx;
+    while(this.ix<evs.length&&evs[this.ix].t<clock+0.22*speed){
+      const ev=evs[this.ix++];
+      const when=this.ctx.currentTime+Math.max(0.005,(ev.t-clock)/speed);
+      try{this.fire(ev,when)}catch(e){}
+    }
+  }
+}
+const sfx=new SwarmSound();
+addEventListener("pointerdown",()=>sfx.ensure(),{capture:true});
+
+/* ================= 完工聚群：光标群跟随真实鼠标 =================
+   boids 式绕场（目标环绕 + 涡旋切向 + 邻域速度对齐 + 鼠标 48px 硬回避），
+   移植自 swarm-cursors 的 follow()。只在预览时间轴走完后的交互态生效，导出不受影响。 */
+const FLOCK={on:false,cs:[],mx:null,my:null,t:0};
+function enterFlock(){
+  if(!S.flock||FLOCK.on)return;
+  S.playing=false;syncPlayBtn();S.clock=script.duration;
+  updateCamera(script.duration,0.05);          // 相机先落到终点（防进度条跳变时拿到旧机位）
+  FLOCK.on=true;FLOCK.t=0;FLOCK.cs=[];confetti=null;
+  for(const k2 in trails)delete trails[k2];
+  for(const c of script.cursors){
+    let p=cursorPos(c,script.duration-0.02);
+    /* 巡览阶段光标已退场、镜头已到页底：种子若远离当前视口，重投到视口边缘外一圈，
+       让光标群从四周飞入围拢鼠标，而不是从几屏之外慢慢爬过来 */
+    const R=n=>rnd(seed*1.7+c.i*13.7+n*7.7);
+    if(!isFinite(p.x)||!isFinite(p.y)||Math.hypot(p.x-cam.x,p.y-cam.y)>H*0.75){
+      const a=R(8)*Math.PI*2;
+      p={x:cam.x+Math.cos(a)*W*0.55,y:cam.y+Math.sin(a)*H*0.62};
+    }
+    FLOCK.cs.push({c,x:p.x,y:p.y,vx:(R(1)-0.5)*160,vy:(R(2)-0.5)*160,
+      orbit:70+R(3)*100,spin:0.8+R(4)*1.0,curl:(R(5)-0.5)*2,
+      speed:600+R(6)*600,force:1400+R(7)*1600});
+  }
+  sfx.ensure();
+  toast("已完工 · 移动鼠标，光标群会跟上（播放键重看）");
+}
+function exitFlock(restart){
+  if(!FLOCK.on)return;
+  FLOCK.on=false;FLOCK.cs=[];FLOCK.mx=FLOCK.my=null;
+  if(restart){S.clock=0;confetti=null;S.playing=true;syncPlayBtn();
+    for(const k2 in trails)delete trails[k2]}
+}
+function stepFlock(dt){
+  dt=Math.min(dt,0.05);FLOCK.t+=dt;
+  const list=FLOCK.cs,time=FLOCK.t;
+  const o=FLOCK.mx!=null?{x:FLOCK.mx,y:FLOCK.my}
+    :{x:W/2+0.28*W*Math.sin(time*0.37),y:H/2+0.25*H*Math.sin(time*0.53+1)};
+  const swirl=Math.tanh(Math.cos(time*0.11)*3);
+  const want=[];
+  for(const c of list){
+    const vx=c.x-o.x,vy=c.y-o.y,d=Math.hypot(vx,vy)||0.01,nx=vx/d,ny=vy/d;
+    const ang=Math.atan2(vy,vx);
+    const R=135*(1+0.18*Math.sin(time*0.55));
+    const rr2=R*(1+0.3*Math.sin(3*ang+time*0.7))+(c.orbit-120)*0.55;
+    const tang=300*(0.7+c.spin*0.2)*swirl;
+    const rad=Math.max(-2600,Math.min(1400,(rr2-d)*4));
+    const far=Math.min(1,Math.max(0,(d-rr2)/600));
+    want.push([-ny*tang+nx*rad-ny*c.curl*400*far, nx*tang+ny*rad+nx*c.curl*400*far]);
+  }
+  for(let i=0;i<list.length;i++){
+    const c=list[i];let ax=0,ay=0,ws=0;
+    for(let j=0;j<list.length;j++){
+      if(j===i)continue;const q=list[j];
+      const d=Math.hypot(q.x-c.x,q.y-c.y);
+      if(d>90)continue;const w=1-d/90;ax+=q.vx*w;ay+=q.vy*w;ws+=w;
+    }
+    let[fx,fy]=want[i];
+    if(ws>0){fx=fx*0.7+(ax/ws)*0.3;fy=fy*0.7+(ay/ws)*0.3}
+    const dist=Math.max(0,Math.hypot(c.x-o.x,c.y-o.y)-180);
+    const maxV=c.speed*(1.3+Math.min(3.2,dist/90));
+    const L=Math.hypot(fx,fy);if(L>maxV){fx*=maxV/L;fy*=maxV/L}
+    let gx=(fx-c.vx)*6,gy=(fy-c.vy)*6;
+    const maxF=c.force*(1.4+Math.min(5,dist/50));
+    const G=Math.hypot(gx,gy);if(G>maxF){gx*=maxF/G;gy*=maxF/G}
+    c.vx+=gx*dt;c.vy+=gy*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;
+  }
+  if(FLOCK.mx!=null)for(const c of list){
+    const vx=c.x-FLOCK.mx,vy=c.y-FLOCK.my,d=Math.hypot(vx,vy)||0.01;
+    if(d<48){c.x=FLOCK.mx+vx/d*48;c.y=FLOCK.my+vy/d*48}
+  }
+}
+cv.addEventListener("mousemove",e=>{
+  const r=cv.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*W/Math.max(1,r.width),my=(e.clientY-r.top)*H/Math.max(1,r.height);
+  FLOCK.mx=(mx-W/2)/cam.z+cam.x;FLOCK.my=(my-H/2)/cam.z+cam.y;
+});
+cv.addEventListener("mouseleave",()=>{FLOCK.mx=FLOCK.my=null});
+
+/* ================= 拖拽尺寸徽章：十字拉框时跟随光标的 W × H 角标 ================= */
+function drawDragBadges(t){
+  if(inReview(t))return;
+  for(const b of script.blocks){
+    const c=b._cur;if(!c)continue;
+    const a=b._tl,wEnd=isPage()?b._t1:b._br;
+    if(a===undefined||wEnd===undefined||wEnd-a<0.08)continue;
+    if(t<a||t>wEnd+0.03)continue;
+    const u=easeOut(clamp((t-a)/(wEnd-a),0,1));
+    const w2=b.w*u,h2=b.h*u,x0=bx(b),y0=by(b);
+    ctx.save();
+    ctx.globalAlpha=0.9;
+    ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1.2;ctx.setLineDash([4,4]);
+    ctx.strokeRect(x0,y0,w2,h2);
+    ctx.setLineDash([]);
+    for(const[hx,hy]of[[x0,y0],[x0+w2,y0],[x0,y0+h2],[x0+w2,y0+h2]]){
+      ctx.fillStyle="#fff";ctx.fillRect(hx-2.5,hy-2.5,5,5);
+      ctx.strokeStyle=c.color;ctx.lineWidth=1.2;ctx.strokeRect(hx-2.5,hy-2.5,5,5);
+    }
+    const label=Math.round(w2)+" × "+Math.round(h2);
+    ctx.font="600 11px Inter,'JetBrains Mono',monospace";
+    const tw2=ctx.measureText(label).width;
+    const px2=Math.min(x0+w2+12,W-tw2-26),py2=Math.max(14,y0+h2-4);
+    ctx.fillStyle=c.color;rr(ctx,px2,py2-9,tw2+14,19,4);ctx.fill();
+    ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(label,px2+7,py2+0.5);
+    ctx.restore();
+  }
+}
+
 /* ================= playback & controls ================= */
 generate();
 fitStage();
 let last=performance.now();
 function frame(now){
   const dt=Math.min((now-last)/1000,0.05);last=now;
-  if(S.playing){
+  if(FLOCK.on)stepFlock(dt*S.speed);
+  if(S.playing&&!FLOCK.on){
     S.clock+=dt*S.speed;
-    if(S.clock>script.duration){S.clock=0;confetti=null;for(const k2 in trails)delete trails[k2]}
+    if(S.clock>script.duration){
+      if(S.flock&&!exporting)enterFlock();     // 走完 → 光标群跟随真实鼠标
+      else{S.clock=0;confetti=null;for(const k2 in trails)delete trails[k2]}
+    }
   }
   render(S.clock,dt*S.speed,now);
+  sfx.sync(S.clock,S.playing&&!FLOCK.on,S.speed);
   $("#scrub").value=Math.round(S.clock/script.duration*1000);
   $("#timeLbl").textContent=S.clock.toFixed(1)+" / "+script.duration.toFixed(1)+"s";
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 $("#scrub").addEventListener("input",e=>{
-  S.playing=false;syncPlayBtn();
+  S.playing=false;syncPlayBtn();exitFlock(false);
   S.clock=e.target.value/1000*script.duration;confetti=null;
   for(const k2 in trails)delete trails[k2];
 });
@@ -2053,9 +2411,25 @@ function syncPlayBtn(){
     ?'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
     :'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
 }
-$("#playBtn").onclick=()=>{S.playing=!S.playing;syncPlayBtn()};
-$("#restartBtn").onclick=()=>{S.clock=0;confetti=null;S.playing=true;syncPlayBtn();for(const k2 in trails)delete trails[k2]};
-$("#shuffleBtn").onclick=()=>{seed=rnd(seed*97+3)*100;generate();confetti=null;S.clock=0;for(const k2 in trails)delete trails[k2];toast("已重新编排光标脚本")};
+$("#playBtn").onclick=()=>{if(FLOCK.on){exitFlock(true);return}sfx.ensure();S.playing=!S.playing;syncPlayBtn()};
+$("#restartBtn").onclick=()=>{exitFlock(false);sfx.ensure();S.clock=0;confetti=null;S.playing=true;syncPlayBtn();for(const k2 in trails)delete trails[k2]};
+$("#shuffleBtn").onclick=()=>{exitFlock(false);seed=rnd(seed*97+3)*100;generate();confetti=null;S.clock=0;for(const k2 in trails)delete trails[k2];toast("已重新编排光标脚本")};
+function syncSndBtn(){
+  $("#sndBtn").innerHTML=S.sound
+    ?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a8.5 8.5 0 0 1 0 12"/></svg>'
+    :'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><path d="m16 9 6 6M22 9l-6 6"/></svg>';
+  $("#sndBtn").title=S.sound?"静音（M）":"开启音效（M）";
+}
+$("#sndBtn").onclick=()=>{sfx.ensure();S.sound=!S.sound;sfx.setOn(S.sound);syncSndBtn()};
+addEventListener("keydown",e=>{
+  if(e.target&&(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"))return;
+  if(e.code==="KeyM"){$("#sndBtn").click()}
+});
+$("#c_sound").addEventListener("change",e=>{sfx.ensure();S.sound=e.target.checked;sfx.setOn(S.sound);syncSndBtn()});
+$("#c_flock").addEventListener("change",e=>{S.flock=e.target.checked;if(!S.flock)exitFlock(false)});
+syncSndBtn();
+/* 调试句柄：控制台/自动化测试用（const 声明不挂 window，这里统一暴露只读视图） */
+window.__CF={get S(){return S},get script(){return script},FLOCK,enterFlock,exitFlock,stepFlock,sfx};
 
 /* ================= 网址 → 自动生成搭建动效 =================
    单文件纯前端，跨域抓取走多通道自动回退：
@@ -2288,9 +2662,13 @@ function extractLayout(d,host){
     const tag=el.tagName.toLowerCase();if(skip.has(tag))continue;
     const cs=win.getComputedStyle(el);
     if(cs.display==="none"||cs.visibility==="hidden"||parseFloat(cs.opacity||1)<0.08)continue;
-    const r=el.getBoundingClientRect(),w=r.width,h=r.height;
+    const r=el.getBoundingClientRect();let w=r.width;const h=r.height;
     if(w<12||h<10||w>vw*1.5||h>docH)continue;
-    const x=Math.round(r.left+win.scrollX),y=Math.round(r.top+win.scrollY);
+    let x=Math.round(r.left+win.scrollX),y=Math.round(r.top+win.scrollY);
+    /* 横向越界裁剪：超宽 banner（如 qq.com 的 1600px 横幅）不许画出画布 */
+    if(x<0){w+=x;x=0}
+    if(x+w>vw)w=vw-x;
+    if(w<12)continue;
     if(y<-200||y>docH+200)continue;
     const direct=[...el.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim())
       .map(n=>n.textContent.trim()).join(" ").slice(0,10);
@@ -2324,10 +2702,14 @@ function extractLayout(d,host){
     });
     if(!dup)chosen.push(e);
   }
+  /* 全局 340 上限按场景带均分配额：超长页面（如 qq.com 11597px）不再
+     「先到先得」堆满上半页、下半页全空，而是每个 700px 带均匀覆盖 */
+  const nSc=Math.max(1,new Set(chosen.map(e=>e.scene)).size);
+  const per=Math.min(46,Math.max(12,Math.ceil(340/nSc)));
   const perScene=new Map(),elems=[];
   for(const e of chosen){
     const n=perScene.get(e.scene)||0;
-    if(n>=46||elems.length>=340)continue;
+    if(n>=per||elems.length>=340)continue;
     perScene.set(e.scene,n+1);
     elems.push({tag:e.tag,x:e.x,y:e.y,w:e.w,h:e.h,r:e.r,kind:e.kind,detail:e.detail,
       scene:e.scene,fs:e.fs,txt:e.txt,col:e.col,fw:e.fw,bt:e.bt,bb:e.bb,vivid:e.vivid,
@@ -2407,7 +2789,7 @@ async function applySite(data,imgSrc,label){
     LPIMG.onload=()=>fin(true);LPIMG.onerror=()=>fin(false);
     LPIMG.src=imgSrc;
     if(LPIMG.complete&&LPIMG.naturalWidth)fin(true);
-    setTimeout(()=>fin(!!(LPIMG.complete&&LPIMG.naturalWidth)),6000);
+    setTimeout(()=>fin(!!(LPIMG.complete&&LPIMG.naturalWidth)),30000);
   });
   LPDATA=data;SITE_LABEL=label||"自定义站点";
   LP.k=LP.w/data.vw;LP.H=data.docH*LP.k;
@@ -2539,8 +2921,8 @@ $("#restoreBtn").onclick=async()=>{
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
   if(e.code==="Space"){e.preventDefault();$("#playBtn").click()}
-  if(e.code==="ArrowRight")S.clock=Math.min(script.duration,S.clock+0.5);
-  if(e.code==="ArrowLeft")S.clock=Math.max(0,S.clock-0.5);
+  if(e.code==="ArrowRight"){exitFlock(false);S.clock=Math.min(script.duration,S.clock+0.5)}
+  if(e.code==="ArrowLeft"){exitFlock(false);S.clock=Math.max(0,S.clock-0.5)}
 });
 $("#presetSel").addEventListener("change",e=>{S.preset=e.target.value;generate();S.clock=0;confetti=null;
   cam.x=W/2;cam.y=H/2;cam.z=1.06;for(const k2 in trails)delete trails[k2]});

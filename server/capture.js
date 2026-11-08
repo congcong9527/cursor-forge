@@ -9,6 +9,7 @@ const puppeteer = require("puppeteer");
 const PORT = 8093;
 const SHOT_DIR = "/www/wwwroot/mouse.livepartner.fans/capture";
 const MAXH = 16000;                       // 与前端 extractLayout 的 docH 上限一致
+const TTL = 10 * 60 * 1000;               // 截图缓存新鲜度：超过 10 分钟自动重采
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -57,9 +58,13 @@ function extractLayout(d, host) {
     const tag = el.tagName.toLowerCase(); if (skip.has(tag)) continue;
     const cs = win.getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity || 1) < 0.08) continue;
-    const r = el.getBoundingClientRect(), w = r.width, h = r.height;
+    const r = el.getBoundingClientRect();let w = r.width;const h = r.height;
     if (w < 12 || h < 10 || w > vw * 1.5 || h > docH) continue;
-    const x = Math.round(r.left + win.scrollX), y = Math.round(r.top + win.scrollY);
+    let x = Math.round(r.left + win.scrollX), y = Math.round(r.top + win.scrollY);
+    /* 横向越界裁剪：超宽 banner（如 qq.com 的 1600px 横幅）不许画出画布 */
+    if (x < 0) { w += x; x = 0; }
+    if (x + w > vw) w = vw - x;
+    if (w < 12) continue;
     if (y < -200 || y > docH + 200) continue;
     const direct = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim())
       .map(n => n.textContent.trim()).join(" ").slice(0, 10);
@@ -93,10 +98,14 @@ function extractLayout(d, host) {
     });
     if (!dup) chosen.push(e);
   }
+  /* 全局 340 上限按场景带均分配额：超长页面（如 qq.com 11597px）不再
+     「先到先得」堆满上半页、下半页全空，而是每个 700px 带均匀覆盖 */
+  const nSc = Math.max(1, new Set(chosen.map(e => e.scene)).size);
+  const per = Math.min(46, Math.max(12, Math.ceil(340 / nSc)));
   const perScene = new Map(), elems = [];
   for (const e of chosen) {
     const n = perScene.get(e.scene) || 0;
-    if (n >= 46 || elems.length >= 340) continue;
+    if (n >= per || elems.length >= 340) continue;
     perScene.set(e.scene, n + 1);
     elems.push({ tag: e.tag, x: e.x, y: e.y, w: e.w, h: e.h, r: e.r, kind: e.kind, detail: e.detail,
       scene: e.scene, fs: e.fs, txt: e.txt, col: e.col, fw: e.fw, bt: e.bt, bb: e.bb, vivid: e.vivid,
@@ -132,10 +141,22 @@ let chain = Promise.resolve();
 
 async function capture(url) {
   const hash = crypto.createHash("md5").update(url).digest("hex").slice(0, 16);
-  const shotPath = SHOT_DIR + "/" + hash + ".png";
-  const pngRef = "/capture/" + hash + ".png";
-  const cached = fs.existsSync(shotPath);
+  const shotPath = SHOT_DIR + "/" + hash + ".jpg";
+  const jsonPath = SHOT_DIR + "/" + hash + ".json";
+  const pngRef = "/capture/" + hash + ".jpg";
   const t0 = Date.now();
+  /* 缓存快速路径：截图在 TTL 内 → 直接回上次结果（png 带文件 mtime 版本号，
+     内容一变 URL 就变，浏览器不会再吃 1 小时的 HTTP 旧缓存） */
+  let mtime = 0;
+  try { mtime = fs.statSync(shotPath).mtimeMs; } catch (e) {}
+  if (mtime > 0 && Date.now() - mtime < TTL) {
+    try {
+      const j = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+      j.png = pngRef + "?v=" + Math.floor(mtime);
+      j.cached = true; j.ms = Date.now() - t0;
+      return j;
+    } catch (e) {}
+  }
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
@@ -160,10 +181,26 @@ async function capture(url) {
       return im.length === 0 || im.every(i => i.complete);
     }, { timeout: 15000 }).catch(() => {});
     /* 隐藏压在首屏上的大块登录/扫码浮层（淘宝等站点自带，遮挡主视觉）：
+       ⓪ 先点掉引导弹窗的关闭控件（「了解了/关闭/×」等，正规关闭路径）
        ① 文本/id/class 命中登录语义的浮层 ② 大块浮层 iframe（弹窗常是跨域 iframe）
-       ③ 覆盖大半屏的半透明遮罩（modal backdrop） */
+       ③ 覆盖大半屏的半透明遮罩（modal backdrop）
+       ④ 居中模态弹窗：fixed/absolute + 视口中央 + 高 z-index + 推广/操作按钮文案 */
     await page.evaluate(() => {
       const vw = innerWidth, vh = innerHeight;
+      const closeWords = /^(了解了?|关闭|跳过|以后再说|下次再说|我知道了|知道了|不再提醒|不再显示|×|✕|close|skip)$/i;
+      document.querySelectorAll("body *").forEach(el => {
+        if (el.children.length > 2) return;
+        const t = (el.textContent || "").trim();
+        if (!t || t.length > 8 || !closeWords.test(t)) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.width > 320 || r.height < 8 || r.height > 140) return;
+        try { el.click(); } catch (e) {}
+      });
+      document.querySelectorAll('[class*="close" i],[class*="Close"],[aria-label*="关闭"],[aria-label*="close" i],[class*="btn-close" i]').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 400 || r.height > 400) return;
+        try { el.click(); } catch (e) {}
+      });
       const isBig = (r) => r.width > vw * 0.22 && r.height > vh * 0.3;
       const isFull = (r) => r.width > vw * 0.98 && r.height > vh * 0.98;
       document.querySelectorAll("body *").forEach(el => {
@@ -189,6 +226,20 @@ async function capture(url) {
         const m = (cs.backgroundColor || "").match(/rgba?\([^)]*?[,\s]([0-9.]+)\)/);
         if (m && parseFloat(m[1]) > 0 && parseFloat(m[1]) < 0.85) el.style.display = "none";
       });
+      /* ④ 居中模态弹窗（如 qq.com 的客户端推广）：视口中央 + fixed/高 z-index + 推广/操作按钮文案 */
+      document.querySelectorAll("body *").forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width < 300 || r.height < 180 || r.height > vh * 0.95) return;
+        const cs = getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden") return;
+        const zi = parseInt(cs.zIndex, 10);
+        const layered = cs.position === "fixed" || (cs.position === "absolute" && zi >= 50);
+        if (!layered) return;
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        if (Math.abs(cx - vw / 2) > vw * 0.18 || Math.abs(cy - vh / 2) > vh * 0.32) return;
+        const key = el.id + " " + el.className + " " + (el.textContent || "").slice(0, 150);
+        if (/立即|体验|下载|客户端|知道了|关闭|扫码|登录|qrcode|download/i.test(key)) el.style.display = "none";
+      });
     }).catch(() => {});
     await sleep(250);
     await sleep(400);
@@ -199,17 +250,18 @@ async function capture(url) {
     ).catch(e => { throw new Error("布局提取失败: " + e.message); });
     if (!data || !data.elems || !data.elems.length) throw new Error("没有解析到可见元素");
     /* 整页截图（超过 16000px 截断，与 data.docH 保持一致） */
-    if (!cached) {
-      fs.mkdirSync(SHOT_DIR, { recursive: true });
-      const h2 = Math.min(data.docH, MAXH);
-      await page.screenshot({ path: shotPath,
-        clip: { x: 0, y: 0, width: Math.min(data.vw, 1280), height: h2 },
-        captureBeyondViewport: true, optimizeForSpeed: false });
-      data.docH = h2;
-    }
-    return { ok: true, host: data.host, title: data.title, desc: data.desc,
+    fs.mkdirSync(SHOT_DIR, { recursive: true });
+    const h2 = Math.min(data.docH, MAXH);
+    await page.screenshot({ path: shotPath,
+      clip: { x: 0, y: 0, width: Math.min(data.vw, 1280), height: h2 },
+      captureBeyondViewport: true, type: "jpeg", quality: 82 });
+    data.docH = h2;
+    const payload = { ok: true, host: data.host, title: data.title, desc: data.desc,
       vw: data.vw, docH: data.docH, elems: data.elems.length,
-      png: pngRef, data, cached, ms: Date.now() - t0 };
+      png: pngRef, data, cached: false, ms: Date.now() - t0 };
+    try { fs.writeFileSync(jsonPath, JSON.stringify(payload)); } catch (e) {}
+    payload.png = pngRef + "?v=" + Math.floor(Date.now());
+    return payload;
   } finally { try { await page.close(); } catch (e) {} }
 }
 
