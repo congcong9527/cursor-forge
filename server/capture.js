@@ -87,6 +87,13 @@ function extractLayout(d, host) {
     const direct = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim())
       .map(n => n.textContent.trim()).join(" ").slice(0, 10);
     const hasBgImg = /url\(/.test(cs.backgroundImage || "");
+    /* 看不见的 div 不画（真实还原）：
+       自身无背景色、无背景图、无直系文字、也不是 img/canvas/video ——
+       它在真实页面里就是一个全透明层（链接热区/遮罩/占位容器），
+       虽然是真实存在的 div，但真实页面上根本看不到它；画出来只会把底下的图片「切」开 */
+    const ownBg = parseBg(cs.backgroundColor);
+    const isMedia = /^(img|canvas|video)$/.test(tag);
+    if (!ownBg && !hasBgImg && !direct && !isMedia) continue;
     const structural = /^(a|button|input|img|h1|h2|h3|h4|h5|h6|p|li|section|article|header|footer|nav)$/.test(tag);
     if (el.children.length && !direct && !hasBgImg && !structural) continue;
     const fs = parseFloat(cs.fontSize) || 14, small = w * h < 9000;
@@ -98,7 +105,7 @@ function extractLayout(d, host) {
     else if (direct && small) kind = "txt";
     else kind = "card";
     const detail = (small || kind === "icon" || kind === "txt") ? 1 : 0;
-    const bg = parseBg(cs.backgroundColor) || bgOf(el, d);
+    const bg = ownBg || bgOf(el, d);
     const lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2];
     const mx = Math.max(bg[0], bg[1], bg[2]), mn = Math.min(bg[0], bg[1], bg[2]);
     cand.push({ _el: el, sel: cssPath(el), tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
