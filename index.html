@@ -758,9 +758,9 @@ function drawDetailCover(b,x,y,opaque,alpha){
   rr(ctx,x,y,b.w,b.h,rad);ctx.clip();
   if(LPIMG.complete&&LPIMG.naturalWidth){
     drawCrop(x,y,b.w,b.h);
-  }else{ctx.fillStyle="#101018";ctx.fillRect(x,y,b.w,b.h)}
-  /* opaque：文字图层用纯色盖住原站字形，彻底消除重影 */
-  ctx.fillStyle=opaque?"#08090f":"rgba(8,9,16,.96)";ctx.fillRect(x,y,b.w,b.h);
+  }else{ctx.fillStyle="rgba(16,16,24,.75)";ctx.fillRect(x,y,b.w,b.h)}
+  /* opaque：文字图层用纯色盖住原站字形，彻底消除重影（黑框统一 25% 透明度，不画纯黑） */
+  ctx.fillStyle="rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
   ctx.restore();
   ctx.save();ctx.globalAlpha=A;ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
   rr(ctx,x+.5,y+.5,b.w-1,b.h-1,rad);ctx.stroke();ctx.restore();
@@ -777,9 +777,9 @@ function drawLayerWell(x,y,w,h,rad,z){
       ctx.lineWidth=1;rr(ctx,x+off*0.5+.5,y+off+.5,w-off-1,h-1,Math.min(rad,6));ctx.stroke();
     }
   }
-  ctx.fillStyle="#05060c";rr(ctx,x,y,w,h,rad);ctx.fill();
+  ctx.fillStyle="rgba(5,6,12,.75)";rr(ctx,x,y,w,h,rad);ctx.fill();
   const g=ctx.createLinearGradient(0,y,0,y+Math.min(h,26));
-  g.addColorStop(0,"rgba(0,0,0,.88)");g.addColorStop(1,"rgba(0,0,0,0)");
+  g.addColorStop(0,"rgba(0,0,0,.62)");g.addColorStop(1,"rgba(0,0,0,0)");
   ctx.fillStyle=g;rr(ctx,x,y,w,Math.min(h,26),rad);ctx.fill();
   ctx.strokeStyle="rgba(255,255,255,.13)";ctx.lineWidth=1;
   rr(ctx,x+.5,y+.5,w-1,h-1,rad);ctx.stroke();
@@ -834,8 +834,8 @@ function drawBlock(b,t,th){
     const ik=easeIO(clamp((t-sk0)/Math.max(b._tl-sk0,0.2),0,1));
     ctx.save();
     ctx.beginPath();ctx.rect(x,y,Math.max(b.w*ik,2),Math.max(b.h*ik,2));ctx.clip();
-    /* 层框先以纯黑凹槽出现：素材稍后从这个黑框底下升上来 */
-    ctx.fillStyle="#05060c";rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
+    /* 层框先以半透明黑凹槽出现：素材稍后从这个黑框底下升上来 */
+    ctx.fillStyle="rgba(5,6,12,.75)";rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
     ctx.globalAlpha=0.4+0.2*Math.sin(t*4+b.x);
     ctx.fillStyle=th.skel;rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
     ctx.globalAlpha=0.9;
@@ -896,7 +896,7 @@ function drawBlock(b,t,th){
       if(b.kind!=="text"&&b.kind!=="txt"){
         if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;ctx.fillRect(x,y,b.w,b.h)}
       }else{
-        ctx.fillStyle="#08090f";ctx.fillRect(x,y,b.w,b.h);
+        ctx.fillStyle="rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
       }
       ctx.restore();
       ctx.restore();
@@ -1039,12 +1039,17 @@ function drawTextLayer(b,t,x,y,AC,st){
     drawDetailCover(b,x,y,true);
     ctx.beginPath();ctx.rect(gx,gy,gw,gh);ctx.clip();
   }else if(cap){
-    ctx.fillStyle=page?"#0a0c16":"rgba(10,12,22,.94)";rr(ctx,gx,gy,gw,gh,page?crad:16);ctx.fill();
+    ctx.fillStyle=page?"rgba(10,12,22,.75)":"rgba(10,12,22,.75)";rr(ctx,gx,gy,gw,gh,page?crad:16);ctx.fill();
     ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;rr(ctx,gx,gy,gw,gh,page?crad:16);ctx.stroke();
   }else{
+    /* 深色采样底同样 25% 透明度；浅色底保持不透明 */
+    const dk=s=>{const m=/(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(s));return m?(0.299*m[1]+0.587*m[2]+0.114*m[3])<78:true};
+    const da=(dk(b.txt.bg[0])&&dk(b.txt.bg[1]))?0.75:1;
+    if(da<1)ctx.globalAlpha=da;
     const g=ctx.createLinearGradient(0,gy,0,gy+gh);
     g.addColorStop(0,b.txt.bg[0]);g.addColorStop(1,b.txt.bg[1]);
     ctx.fillStyle=g;rr(ctx,gx,gy,gw,gh,crad);ctx.fill();
+    if(da<1)ctx.globalAlpha=1;
   }
   // 打字文字
   const lines=b.txt.text.split("\n");
