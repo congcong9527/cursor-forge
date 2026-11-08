@@ -53,6 +53,24 @@ function extractLayout(d, host) {
   const docH = Math.max(600, Math.min(16000, Math.round(Math.max(
     d.body.scrollHeight, d.documentElement.scrollHeight, d.body.getBoundingClientRect().height) || 900)));
   const skip = new Set(["script", "style", "noscript", "iframe", "svg", "path", "br", "hr", "meta", "link", "head", "title", "option", "source", "picture"]);
+  /* 真实 CSS 选择器路径：拉框对应的不是几何猜测，而是这个确切的 div（最多上溯 4 层） */
+  const cssPath = el => {
+    const parts = []; let n = el, depth = 0;
+    while (n && n.nodeType === 1 && depth < 4) {
+      const tg = n.tagName.toLowerCase();
+      if (tg === "html") break;
+      let s = tg;
+      if (n.id) { parts.unshift(s + "#" + n.id); break }
+      const cls = (typeof n.className === "string" && n.className.trim())
+        ? n.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+      if (cls.length) s += "." + cls.join(".");
+      const p = n.parentElement;
+      if (p) { const same = [...p.children].filter(ch => ch.tagName === n.tagName);
+        if (same.length > 1) s += ":nth-of-type(" + (same.indexOf(n) + 1) + ")" }
+      parts.unshift(s); n = p; depth++;
+    }
+    return parts.join(">").slice(0, 72);
+  };
   const cand = [];
   for (const el of d.body.querySelectorAll("*")) {
     const tag = el.tagName.toLowerCase(); if (skip.has(tag)) continue;
@@ -83,7 +101,7 @@ function extractLayout(d, host) {
     const bg = parseBg(cs.backgroundColor) || bgOf(el, d);
     const lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2];
     const mx = Math.max(bg[0], bg[1], bg[2]), mn = Math.min(bg[0], bg[1], bg[2]);
-    cand.push({ _el: el, tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
+    cand.push({ _el: el, sel: cssPath(el), tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
       kind, detail, scene: Math.max(0, Math.floor(y / 700)),
       fs: Math.round(fs), txt: direct || (kind === "icon" ? "图标" : ""), col: cs.color || "rgb(240,240,248)",
       fw: String(cs.fontWeight || "400"), bt: bg, bb: bg, vivid: (mx - mn > 70 && lum > 90) ? 1 : 0 });
@@ -116,12 +134,26 @@ function extractLayout(d, host) {
   /* 全局 900 上限按场景带均分配额：向 swarm-cursors 的「逐元素精准描绘、不遗漏」看齐 */
   const nSc = Math.max(1, new Set(chosen.map(e => e.scene)).size);
   const per = Math.min(80, Math.max(20, Math.ceil(900 / nSc)));
+  /* 真实性核验：对每个入选框回查它的真实 DOM 元素，重读 getBoundingClientRect 比对坐标 */
+  let vMatch = 0, vOff = 0; const vBad = [];
+  for (const e of chosen) {
+    if (!e._el) continue;
+    const r2 = e._el.getBoundingClientRect();
+    let vx = Math.round(r2.left + win.scrollX), vy = Math.round(r2.top + win.scrollY);
+    let vw2 = Math.round(r2.width), vh2 = Math.round(r2.height);
+    if (vx < 0) { vw2 += vx; vx = 0 }
+    if (vx + vw2 > vw) vw2 = vw - vx;
+    if (Math.abs(vx - e.x) <= 1 && Math.abs(vy - e.y) <= 1 && Math.abs(vw2 - e.w) <= 1 && Math.abs(vh2 - e.h) <= 1) vMatch++;
+    else { vOff++; if (vBad.length < 6) vBad.push((e.sel || e.tag) + " @(" + e.x + "," + e.y + " " + e.w + "×" + e.h + " vs " + vx + "," + vy + " " + vw2 + "×" + vh2 + ")") }
+  }
+  if (vOff) console.log("[CursorForge] 坐标核验：" + vMatch + " 个框与真实 DOM 完全一致，" + vOff + " 个偏移: " + vBad.join(" | "));
+  else console.log("[CursorForge] 坐标核验：全部 " + vMatch + " 个框与真实 DOM getBoundingClientRect 完全一致（1px 容差）");
   const perScene = new Map(), elems = [];
   for (const e of chosen) {
     const n = perScene.get(e.scene) || 0;
     if (n >= per || elems.length >= 900) continue;
     perScene.set(e.scene, n + 1);
-    elems.push({ tag: e.tag, x: e.x, y: e.y, w: e.w, h: e.h, r: e.r, kind: e.kind, detail: e.detail,
+    elems.push({ sel: e.sel, tag: e.tag, x: e.x, y: e.y, w: e.w, h: e.h, r: e.r, kind: e.kind, detail: e.detail,
       scene: e.scene, fs: e.fs, txt: e.txt, col: e.col, fw: e.fw, bt: e.bt, bb: e.bb, vivid: e.vivid,
       bg: "rgb(" + e.bt.join(",") + ")", pos: "relative" });
   }
@@ -173,6 +205,11 @@ async function capture(url) {
   }
   const browser = await getBrowser();
   const page = await browser.newPage();
+  /* extractLayout 在页面上下文里做坐标核验，把它打的日志转发到服务日志（journalctl 可查） */
+  page.on("console", m => {
+    const t = m.text() || "";
+    if (t.includes("[CursorForge]")) console.log(t);
+  });
   try {
     await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
     await page.setUserAgent(UA);
