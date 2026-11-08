@@ -192,7 +192,22 @@ function getBrowser() {
 }
 let chain = Promise.resolve();
 
+/* 对外入口：骨架页防护。qq.com 等站点偶发返回未加载完的反爬骨架页
+   （整页只有 ~1641px 高、元素极少），动画会全程黑屏。
+   第一次按严格模式采（骨架页判失败自动重采），第二次宽松兜底。 */
 async function capture(url) {
+  let lastErr = null;
+  for (let a = 0; a < 2; a++) {
+    try {
+      const r = await captureOnce(url, a === 0);
+      if (a > 0) console.log("[CursorForge] 第 2 次采集成功（第 1 次为骨架页已弃用）");
+      return r;
+    } catch (e) { lastErr = e; console.log("[CursorForge] 采集尝试 " + (a + 1) + " 失败: " + e.message); }
+  }
+  throw lastErr;
+}
+
+async function captureOnce(url, strict) {
   const hash = crypto.createHash("md5").update(url).digest("hex").slice(0, 16);
   const shotPath = SHOT_DIR + "/" + hash + ".jpg";
   const jsonPath = SHOT_DIR + "/" + hash + ".json";
@@ -338,6 +353,9 @@ async function capture(url) {
       `${parseBg};${bgOf};${extractLayout};\nextractLayout(document,${JSON.stringify(host)})`
     ).catch(e => { throw new Error("布局提取失败: " + e.message); });
     if (!data || !data.elems || !data.elems.length) throw new Error("没有解析到可见元素");
+    /* 骨架页判定：页高超矮 + 元素超少 = 页面没加载完（或反爬骨架页），严格模式直接判失败重采 */
+    if (strict && data.docH < 2500 && data.elems.length < 80)
+      throw new Error("页面疑似骨架页（docH=" + data.docH + ", elems=" + data.elems.length + "）");
     /* 整页截图（超过 16000px 截断，与 data.docH 保持一致） */
     fs.mkdirSync(SHOT_DIR, { recursive: true });
     const h2 = Math.min(data.docH, MAXH);
