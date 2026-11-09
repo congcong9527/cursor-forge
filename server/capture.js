@@ -113,6 +113,9 @@ function extractLayout(d, host) {
     const mx = Math.max(bg[0], bg[1], bg[2]), mn = Math.min(bg[0], bg[1], bg[2]);
     cand.push({ _el: el, sel: cssPath(el), tag, x, y, w: Math.round(w), h: Math.round(h), r: parseFloat(cs.borderRadius) || 0,
       kind, detail, scene: Math.max(0, Math.floor(y / 700)),
+      /* 宽幅结构条（导航条/页脚条等）：只铺自身底色，子元素保留逐个细节描绘 */
+      flat: (w >= capW * 0.55 && h <= 220 && (ownBg || hasBgImg) &&
+        el.querySelector("a,button,img,h1,h2,h3,h4,h5,h6,li,p")) ? 1 : 0,
       fs: Math.round(fs), txt: direct || (kind === "icon" ? "图标" : ""), col: cs.color || "rgb(240,240,248)",
       fw: String(cs.fontWeight || "400"), bt: bg, bb: bg, vivid: (mx - mn > 70 && lum > 90) ? 1 : 0 });
   }
@@ -132,7 +135,8 @@ function extractLayout(d, host) {
     for (const s of chosen) {
       if (s.x === e.x && s.y === e.y && s.w === e.w && s.h === e.h) { drop = true; break }
       if (s._el && e._el && s._el.contains(e._el)) {
-        if (e.w * e.h < 0.72 * s.w * s.h) { drop = true; break }
+        /* flat 宽幅结构条（导航等）只作底色：子元素不并入，保留逐个细节描绘 */
+        if (e.w * e.h < 0.72 * s.w * s.h) { if (!s.flat) { drop = true; break } continue }
         continue;
       }
       const I = interAB(e, s); if (I <= 0) continue;
@@ -165,7 +169,7 @@ function extractLayout(d, host) {
     if (n >= per || elems.length >= 900) continue;
     perScene.set(e.scene, n + 1);
     elems.push({ sel: e.sel, tag: e.tag, x: e.x, y: e.y, w: e.w, h: e.h, r: e.r, kind: e.kind, detail: e.detail,
-      scene: e.scene, fs: e.fs, txt: e.txt, col: e.col, fw: e.fw, bt: e.bt, bb: e.bb, vivid: e.vivid,
+      scene: e.scene, fs: e.fs, txt: e.txt, col: e.col, fw: e.fw, bt: e.bt, bb: e.bb, vivid: e.vivid, flat: e.flat || 0,
       bg: "rgb(" + e.bt.join(",") + ")", pos: "relative" });
   }
   const bodyBg = parseBg(win.getComputedStyle(d.body).backgroundColor) ||
@@ -241,17 +245,46 @@ async function captureOnce(url, strict) {
     await page.setUserAgent(UA);
     await page.setExtraHTTPHeaders({ "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8" });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
+    /* 慢注水页面等待（bilibili 等信息流站点）：scrollHeight 连续两次采样
+       不再增长才认为页面加载完。之前 networkidle2 一过就量页高，
+       bilibili 量到 2793px（真实上万）、元素只有 127 个 —— 搭建期大片空白 */
+    const growWait = async () => {
+      let stable = 0, last = -1;
+      for (let i = 0; i < 10 && stable < 2; i++) {
+        await sleep(800);
+        const h = await page.evaluate(() => Math.max(
+          document.body ? document.body.scrollHeight : 0,
+          document.documentElement ? document.documentElement.scrollHeight : 0) || 0).catch(() => 0);
+        if (Math.abs(h - last) < 60) stable++; else stable = 0;
+        last = h;
+      }
+      return last;
+    };
+    await growWait();
     /* 整页滚动一遍触发懒加载，等图片真实加载完成 */
     const H = await page.evaluate(() => Math.max(
       document.body ? document.body.scrollHeight : 0,
       document.documentElement ? document.documentElement.scrollHeight : 0) || 0);
     if (H > 900) {
-      for (let y = 0; y < H; y += 900) {
-        await page.evaluate(_y => scrollTo(0, _y), y).catch(() => {});
-        await sleep(130);
+      /* 无限信息流站点（bilibili 等）：反复滚动触底直到页高不再增长。
+         这类站点首次触底只追加一批内容，必须滚到新底部再触发下一批 */
+      let prev = -1;
+      for (let round = 0; round < 8; round++) {
+        const hCur = await page.evaluate(() => Math.max(
+          document.body ? document.body.scrollHeight : 0,
+          document.documentElement ? document.documentElement.scrollHeight : 0) || 0).catch(() => 0);
+        if (Math.abs(hCur - prev) < 60) break;
+        prev = hCur;
+        for (let y = 0; y < hCur; y += 800) {
+          await page.evaluate(_y => scrollTo(0, _y), y).catch(() => {});
+          await sleep(110);
+        }
+        await page.evaluate(() => scrollTo(0, document.body ? document.body.scrollHeight : 0)).catch(() => {});
+        await sleep(650);
       }
       await page.evaluate(() => scrollTo(0, 0)).catch(() => {});
       await sleep(350);
+      await growWait();                     // 收尾再等一轮高度稳定
     }
     await page.waitForFunction(() => {
       const im = [...document.images];

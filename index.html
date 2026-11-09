@@ -243,7 +243,7 @@ function layerZ(b){
 }
 let seed=7;
 /* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
-const CF_VER="v3.19 · 1109m";
+const CF_VER="v3.19 · 1109o";
 console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
@@ -273,6 +273,7 @@ function presets(){
     LPDATA.elems.forEach((e,ei)=>{
       const det=!!e.detail;
       const blk=P({type:"elem",ei,kind:e.kind,detail:det,scene:e.scene||0,sel:e.sel||"",
+        flat:!!e.flat,
         x:e.x*LP.k,y:e.y*LP.k,w:e.w*LP.k,h:e.h*LP.k,
         _bgLum:(()=>{  /* 所在背景带的亮度：浅色页面用浅色层槽，避免白底上浮着黑块 */
           const bd=(LPDATA.backs||[]).find(s=>e.y>=s.y&&e.y<s.y+s.h);
@@ -290,6 +291,7 @@ function presets(){
         blk.cover=["rgb("+e.bt.join(",")+")","rgb("+e.bb.join(",")+")"];
         blk.vivid=!!e.vivid;
       }
+      if(blk.flat)blk.cover=["rgb("+e.bt.join(",")+")","rgb("+e.bt.join(",")+")"];
       if(e.kind==="text"||e.kind==="txt"){
         const hero=!det&&e.y<760;
         blk.txt={text:hero?"带货主播\n让本色更出色":e.txt,
@@ -934,7 +936,21 @@ function drawBlock(b,t,th){
       ctx.beginPath();ctx.rect(x,y,b.w,b.h);ctx.clip();
       ctx.translate(0,drop);
       if(b.kind!=="text"&&b.kind!=="txt"){
-        if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;ctx.fillRect(x,y,b.w,b.h)}
+        /* flat 宽幅结构条：铺「真实截图采样的平均色」，细节由子元素块逐个画出 */
+        if(b.flat){
+          if(b._avg===undefined&&LPIMG.complete&&LPIMG.naturalWidth){
+            try{const c2=document.createElement("canvas");c2.width=8;c2.height=4;
+              const g2=c2.getContext("2d",{willReadFrequently:true});
+              g2.drawImage(LPIMG,b.crop.sx,b.crop.sy,b.crop.sw,b.crop.sh,0,0,8,4);
+              const d2=g2.getImageData(0,0,8,4).data;let r2=0,g3=0,b3=0;
+              for(let i=0;i<d2.length;i+=4){r2+=d2[i];g3+=d2[i+1];b3+=d2[i+2]}
+              const n2=d2.length/4||1;b._avg=[r2/n2|0,g3/n2|0,b3/n2|0];
+            }catch(e){b._avg=null}
+          }
+          ctx.fillStyle=b._avg?("rgb("+b._avg.join(",")+")"):(b.cover?b.cover[0]:th.skel);
+          ctx.fillRect(x,y,b.w,b.h);
+        }
+        else if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;ctx.fillRect(x,y,b.w,b.h)}
       }else{
         ctx.fillStyle=(b._bgLum||0)>=150?"rgba(246,247,251,.85)":"rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
       }
@@ -2802,6 +2818,10 @@ function extractLayout(d,host){
     const mx=Math.max(bg[0],bg[1],bg[2]),mn=Math.min(bg[0],bg[1],bg[2]);
     cand.push({_el:el,sel:cssPath(el),tag,x,y,w:Math.round(w),h:Math.round(h),r:parseFloat(cs.borderRadius)||0,
       kind,detail,scene:Math.max(0,Math.floor(y/700)),
+      /* 宽幅结构条（导航条/页脚条等，纯色或背景图皮肤均可）：标记 flat ——
+         构建期只铺自身底色，子元素（logo/链接/按钮）保留下来逐个细节描绘，
+         避免整条一次成型；巡览阶段仍结晶为真实整页截图 */
+      flat:(w>=capW*0.55&&h<=220&&(ownBg||hasBgImg)&&el.querySelector("a,button,img,h1,h2,h3,h4,h5,h6,li,p"))?1:0,
       fs:Math.round(fs),txt:direct||(kind==="icon"?"图标":""),col:cs.color||"rgb(240,240,248)",
       fw:String(cs.fontWeight||"400"),bt:bg,bb:bg,vivid:(mx-mn>70&&lum>90)?1:0});
   }
@@ -2823,7 +2843,8 @@ function extractLayout(d,host){
     for(const s of chosen){
       if(s.x===e.x&&s.y===e.y&&s.w===e.w&&s.h===e.h){drop=true;break}  // 完全重复矩形去重
       if(s._el&&e._el&&s._el.contains(e._el)){
-        if(e.w*e.h<0.72*s.w*s.h){drop=true;break}
+        /* flat 宽幅结构条（导航等）只作底色：子元素不并入，保留逐个细节描绘 */
+        if(e.w*e.h<0.72*s.w*s.h){if(!s.flat){drop=true;break}continue}
         continue;                                    // 祖先后代不按几何切割论处
       }
       const I=interAB(e,s);if(I<=0)continue;
@@ -2857,7 +2878,7 @@ function extractLayout(d,host){
     if(n>=per||elems.length>=900)continue;
     perScene.set(e.scene,n+1);
     elems.push({sel:e.sel,tag:e.tag,x:e.x,y:e.y,w:e.w,h:e.h,r:e.r,kind:e.kind,detail:e.detail,
-      scene:e.scene,fs:e.fs,txt:e.txt,col:e.col,fw:e.fw,bt:e.bt,bb:e.bb,vivid:e.vivid,
+      scene:e.scene,fs:e.fs,txt:e.txt,col:e.col,fw:e.fw,bt:e.bt,bb:e.bb,vivid:e.vivid,flat:e.flat||0,
       bg:"rgb("+e.bt.join(",")+")",pos:"relative"});
   }
   const bodyBg=parseBg(win.getComputedStyle(d.body).backgroundColor)||
