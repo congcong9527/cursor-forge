@@ -50,9 +50,9 @@ function bgOf(el, d) {
 function extractLayout(d, host) {
   const win = d.defaultView;
   const vw = Math.max(320, Math.min(2200, Math.round(d.documentElement.scrollWidth || 1280)));
-  /* 截图实际宽度：clip 上限 1280。元素坐标一律按 capW 裁剪，
-     否则横向溢出的元素（坐标 > 1280）会去截图外取像素 —— 右侧整列照片被切断 */
-  const capW = Math.min(vw, 1280);
+  /* 截图实际宽度：clip 上限 1600（服务端会先把视口加宽到 scrollWidth）。
+     元素坐标一律按 capW 裁剪，否则横向溢出的元素（坐标 > capW）会去截图外取像素 */
+  const capW = Math.min(vw, 1600);
   const docH = Math.max(600, Math.min(16000, Math.round(Math.max(
     d.body.scrollHeight, d.documentElement.scrollHeight, d.body.getBoundingClientRect().height) || 900)));
   const skip = new Set(["script", "style", "noscript", "iframe", "svg", "path", "br", "hr", "meta", "link", "head", "title", "option", "source", "picture"]);
@@ -327,6 +327,24 @@ async function captureOnce(url, strict) {
     await page.addStyleTag({
       content: "*,*::before,*::after{animation:none!important;transition:none!important;zoom:1!important}"
     }).catch(() => {});
+    /* 横向溢出加宽：页面 scrollWidth 超出视口宽 = 最右列会被截断。
+       把视口加宽到 scrollWidth（上限 1600）再提取，整页宽度完整入镜。 */
+    let capW = 1280;
+    {
+      const sw = await page.evaluate(() => Math.max(
+        document.body ? document.body.scrollWidth : 0,
+        document.documentElement ? document.documentElement.scrollWidth : 0) || 0).catch(() => 0);
+      if (sw > capW + 4) {
+        capW = Math.min(sw, 1600);
+        await page.setViewport({ width: capW, height: 900 }).catch(() => {});
+        await sleep(500);
+        const sw2 = await page.evaluate(() => Math.max(
+          document.body ? document.body.scrollWidth : 0,
+          document.documentElement ? document.documentElement.scrollWidth : 0) || 0).catch(() => 0);
+        if (sw2 > capW + 4) capW = Math.min(sw2, 1600);
+        console.log("[CursorForge][wide] scrollWidth=" + sw + " -> capW=" + capW);
+      }
+    }
     /* 关键修复：先让视口与「整页截图时的状态」一致，再提取布局。
        之前顺序是「提取坐标 → captureBeyondViewport 截图」，而 captureBeyondViewport
        会把视口临时拉成整页高，vh 布局/懒加载/容器查询会因此再排版一次，
@@ -335,7 +353,7 @@ async function captureOnce(url, strict) {
        设视口 → 等稳定 → 重测页高 → 再设视口 … 直到页高不再变化，才提取坐标、截图。 */
     let vh = Math.max(600, Math.min(H, MAXH));
     for (let it = 0; it < 3; it++) {
-      await page.setViewport({ width: 1280, height: vh }).catch(() => {});
+      await page.setViewport({ width: capW, height: vh }).catch(() => {});
       await sleep(650);
       await page.waitForFunction(() => {
         const im = [...document.images];
@@ -362,8 +380,9 @@ async function captureOnce(url, strict) {
     fs.mkdirSync(SHOT_DIR, { recursive: true });
     const h2 = Math.min(data.docH, MAXH);
     if (Math.abs(h2 - vh) > 4) {
-      /* 提取后页高仍变了（信息流继续注入）：最后对齐一次再拍 */
-      await page.setViewport({ width: 1280, height: h2 }).catch(() => {});
+      /* 提取后页高仍变了（信息流继续注入）：最后对齐一次再拍。
+         宽度保持与提取时一致（加宽后的视口），否则布局回缩、坐标全部错位 */
+      await page.setViewport({ width: Math.min(Math.max(1280, data.vw), 1600), height: h2 }).catch(() => {});
       await sleep(500);
     }
     /* 视口已是整页高 → 用普通视口截图（所见即所量）。
@@ -377,7 +396,7 @@ async function captureOnce(url, strict) {
     const fingerprint = d => d.elems.length + "@" + d.docH + ":" +
       d.elems.slice(0, 60).map(e => e.x + "," + e.y + "," + e.w + "," + e.h).join(";");
     const takeShot = () => page.screenshot({
-      clip: { x: 0, y: 0, width: Math.min(data.vw, 1280), height: Math.min(data.docH, MAXH) },
+      clip: { x: 0, y: 0, width: Math.min(data.vw, 1600), height: Math.min(data.docH, MAXH) },
       captureBeyondViewport: beyond, type: "jpeg", quality: 82 });
     let buf = await takeShot();
     let data2 = await page.evaluate(

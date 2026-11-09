@@ -140,7 +140,7 @@ input[type=color]{width:34px;height:26px;border:1px solid var(--border2);border-
     </section>
     <section><h6>光标</h6>
       <div class="ctl"><div class="row"><span>光标数量</span><span class="val" id="v_nCur"></span></div>
-        <input type="range" id="r_nCur" min="4" max="24" step="1" value="24"></div>
+        <input type="range" id="r_nCur" min="4" max="48" step="1" value="24"></div>
       <div class="ctl"><div class="row"><span>动效速度</span><span class="val" id="v_speed"></span></div>
         <input type="range" id="r_speed" min="0.5" max="2" step="0.05" value="1"></div>
       <label class="chk"><input type="checkbox" id="c_names" checked>显示光标名字牌</label>
@@ -243,7 +243,7 @@ function layerZ(b){
 }
 let seed=7;
 /* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
-const CF_VER="v3.19 · 1109k";
+const CF_VER="v3.19 · 1109l";
 console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
@@ -348,7 +348,7 @@ const TYPE_LABEL={nav:"导航栏",text:"文案",btn:"按钮",img:"图片",logos:
    → 移到中心抓起 → 拖偏微调 → 拉回原位松手 → 离开            */
 function generate(){
   const blocks=presets();
-  const nCur=Math.max(4,Math.min(S.nCur,24));
+  const nCur=Math.max(4,Math.min(S.nCur,48));
   const cursors=[];
   /* 每位「操作员」固定的手法参数：倾斜角、光标大小、按键回弹、拖尾、空闲游走、
      绕场半径/相位、跟队错位。同一 seed 下稳定，点「重新编排」会整体换一套，
@@ -382,15 +382,36 @@ function generate(){
     /* 实拍模式：按元素布局并发搭建 —— 每个元素一只光标，多只光标同时开工 */
     const bands=blocks.filter(b=>b.type==="band");
     const elems=blocks.filter(b=>b.type==="elem");
-    // 1. 背景带：1 号光标自上而下把底铺开
+    /* 光标池空闲分配 + 按需扩容：保证同一时刻每个块都有自己专属的光标。
+       此前按波次取模分配，一只光标会同时被两个块占用 —— 看起来就是
+       「框自己冒出来、没有光标拉」。不够用时自动扩容（上限 HARDMAX）。 */
+    const HARDMAX=48,busy=new Map();
+    const freeCur=(t0,tEnd)=>{
+      let best=cursors.find(c=>(busy.get(c.i)||0)<=t0+0.02)||null;
+      if(!best&&cursors.length<HARDMAX){
+        const i=cursors.length,Q2=n=>rnd(seed*0.53+i*11.37+n*23.9);
+        best={name:NAMES[i%NAMES.length],color:CCOLORS[i%CCOLORS.length],i,
+          x:-120-rnd(i*3)*300,y:rnd(i*5)*H,trail:[],
+          _p:{tilt:(Q2(1)-0.5)*0.26,size:0.93+Q2(2)*0.15,bounce:0.17+Q2(3)*0.20,
+              tw:0.10+Q2(4)*0.10,tline:2.1+Q2(5)*1.8,
+              jf:0.72+Q2(6)*1.15,jp:Q2(7)*6.283,ja:1.5+Q2(8)*3.6,
+              spin:(Q2(9)-0.5)*0.10,lag:(Q2(10)-0.5)*0.11,off:(Q2(11)-0.5)*13}};
+        cursors.push(best);
+      }
+      if(!best)best=cursors.reduce((a,b2)=>((busy.get(a.i)||0)<=(busy.get(b2.i)||0)?a:b2));
+      busy.set(best.i,tEnd);
+      return best;
+    };
+    // 1. 背景带：空闲光标逐条从左上角斜拉铺开
     let tw=intro?intro.build0+0.02:1.0;
     bands.forEach((b,i)=>{
-      const c=cursors[0];
+      const c=freeCur(tw+i*0.15,tw+i*0.15+0.26);          // 空闲分配，避免带间串扰
       const t0=tw+i*0.15;
       b._tl=t0;b._t1=t0+0.16;b._tIn=t0+0.16;b._br=t0+0.2;b._fDur=0.16;b._fFill=0.04;
       b._sk0=t0-0.2;b._end=t0+0.22;
-      events.push({t:t0,c,x:LP.x+18,y:by(b)+b.h*0.5,kind:i?"point":"press",block:b,moveDur:0.16,bandEv:true});
-      events.push({t:t0+0.18,c,x:LP.x+LP.w-18,y:by(b)+b.h*0.5,kind:"point",block:b,moveDur:0.18,straight:true,bandEv:true});
+      /* 与元素统一手法：从背景带左上角按下，斜拉到右下角松手 */
+      events.push({t:t0,c,x:LP.x+16,y:by(b)+16,kind:i?"point":"press",block:b,moveDur:0.16,bandEv:true});
+      events.push({t:t0+0.18,c,x:LP.x+LP.w-16,y:by(b)+b.h-16,kind:"point",block:b,moveDur:0.18,straight:true,bandEv:true});
       finish=Math.max(finish,b._end);
     });
     const tBase=tw+bands.length*0.15+0.28;
@@ -420,11 +441,11 @@ function generate(){
       b._cur=c;b._wave=wi;b._tl=t0;b._t1=t1;b._tIn=tIn;b._br=t2;
       b._fDur=fD;b._fFill=fF;b._sk0=t0-(short?0.3:0.5);
       // 拉框手法每人不一样：左上→右下 / 右上→左下 / 左下→右上，随机取一
-      const m=(short?0.16:0.26)*(0.6+Q(3)*0.8);
+      const m=(short?0.2:0.3)*(0.75+Q(3)*0.5);
       const o1=3+jt(4,2.2),o2=3+jt(5,2.2),o3=6+jt(6,2.6),o4=5+jt(7,2.0);
-      const v=Math.floor(Q(26)*3);
-      const dFrom=v===1?{x:b.w-o2,y:o1}:{x:o1,y:v===2?b.h-o2:o1};
-      const dTo=v===1?{x:o1,y:b.h-o2}:{x:b.w-o2,y:v===2?o1:b.h-o2};
+      /* 统一手法：光标精确地从左上角按下、斜拉到右下角松手（每个框必走这一步） */
+      const dFrom={x:o1,y:o1};
+      const dTo={x:b.w-o2,y:b.h-o2};
       b._dragFrom={x:bx(b)+dFrom.x,y:by(b)+dFrom.y};
       b._dragTo={x:bx(b)+dTo.x,y:by(b)+dTo.y};
       events.push({t:t0,c,x:bx(b)+dFrom.x,y:by(b)+dFrom.y,kind:"press",block:b,moveDur:m});
@@ -463,6 +484,7 @@ function generate(){
       events.push({t:tS3+0.1,c,x:sX+34+jt(22,15),y:sY+38+jt(23,15),kind:"leave",moveDur:0.2*(0.8+Q(24)*0.5)});
       b._sty={t0:tS,t1:tS1,t2:tS2,t3:tS3,end:tS3+(short?0.12:0.2)};
       b._end=b._sty.end;
+      busy.set(c.i,Math.max(busy.get(c.i)||0,b._end+0.05)); // 整段仪式结束才释放光标
       if(b._txt){b._txt.tg=tG;b._txt.tn=tN;b._txt.tr=tR;b._txt.ndx=ndx;b._txt.ndy=ndy;
                  b._txt.ts=tS;b._txt.t1=tS1;b._txt.t2=tS2;b._txt.t3=tS3;b._txt.end=b._end;}
       finish=Math.max(finish,b._end);
@@ -498,16 +520,18 @@ function generate(){
       let lastSt=wt;
       for(let i=0;i<S0.length;i+=MAXC){
         const wi=waveIdx++,ws=wt,chunk=S0.slice(i,i+MAXC);
-        chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
-          ws+rnd(seed*0.87+wi*13.3+bi*7.7)*0.85,false,wi));   // 起手随机铺开 0.85s
+        chunk.forEach((b,bi)=>{
+          const t0=ws+rnd(seed*0.87+wi*13.3+bi*7.7)*0.85;   // 起手随机铺开 0.85s
+          schedule(b,freeCur(t0,t0+2.9),t0,false,wi)});
         wt+=1.34*(0.82+rnd(seed*1.31+wi*0.73)*0.42);          // 波次节奏抖动
         lastSt=ws;
       }
       wt=Math.max(wt,lastSt+(S0.length?1.0:0));
       for(let i=0;i<D0.length;i+=MAXC){
         const wi=waveIdx++,ws=wt,chunk=D0.slice(i,i+MAXC);
-        chunk.forEach((b,bi)=>schedule(b,cursors[((wi%2)*MAXC+bi)%nCur],
-          ws+rnd(seed*0.91+wi*17.1+bi*5.9)*0.8,true,wi));
+        chunk.forEach((b,bi)=>{
+          const t0=ws+rnd(seed*0.91+wi*17.1+bi*5.9)*0.8;
+          schedule(b,freeCur(t0,t0+2.2),t0,true,wi)});
         wt+=0.9*(0.78+rnd(seed*2.17+wi*0.53)*0.44);
       }
       wt+=0.16;
@@ -762,16 +786,17 @@ function drawDetailCover(b,x,y,opaque,alpha){
   const A=alpha===undefined?1:clamp(alpha,0,1);
   if(A<=0)return;
   const rad=Math.min(b.rad||2,10);
+  const lightC=(b._bgLum||0)>=150;
   ctx.save();
   ctx.globalAlpha=A;
   rr(ctx,x,y,b.w,b.h,rad);ctx.clip();
   if(LPIMG.complete&&LPIMG.naturalWidth){
     drawCrop(x,y,b.w,b.h);
-  }else{ctx.fillStyle="rgba(16,16,24,.75)";ctx.fillRect(x,y,b.w,b.h)}
-  /* opaque：文字图层用纯色盖住原站字形，彻底消除重影（黑框统一 25% 透明度，不画纯黑） */
-  ctx.fillStyle="rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
+  }else{ctx.fillStyle=lightC?"rgba(240,242,247,.8)":"rgba(16,16,24,.75)";ctx.fillRect(x,y,b.w,b.h)}
+  /* opaque：文字图层用纯色盖住原站字形，彻底消除重影（浅色页面自动切换浅色遮盖） */
+  ctx.fillStyle=lightC?"rgba(246,247,251,.85)":"rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
   ctx.restore();
-  ctx.save();ctx.globalAlpha=A;ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
+  ctx.save();ctx.globalAlpha=A;ctx.strokeStyle=lightC?"rgba(0,0,0,.08)":"rgba(255,255,255,.10)";ctx.lineWidth=1;
   rr(ctx,x+.5,y+.5,b.w-1,b.h-1,rad);ctx.stroke();ctx.restore();
 }
 /* 黑色层槽：素材所在的「图层井」，下方透出堆叠的图层边，表现 z 深度。
@@ -821,11 +846,11 @@ function drawLayerChip(x,y,z,drop,AC){
 }
 function drawBlock(b,t,th){
   const x=bx(b),y=by(b),AC=S.accent;
-  // 背景带：光标横向刷开纯色底
+  // 背景带：光标从左上角斜拉到右下角，矩形跟随光标角点从角落长出来
   if(b.type==="band"){
     if(t<b._tl)return;
     const bp=easeOut(clamp((t-b._tl)/Math.max(b._br-b._tl,0.05),0,1));
-    ctx.fillStyle=b.bg;ctx.fillRect(x,y,b.w*bp,b.h);
+    ctx.fillStyle=b.bg;ctx.fillRect(x,y,b.w*bp,b.h*bp);
     return;
   }
   /* 占位块跟随「包含它的父结构块画完」或自身骨架起点，并淡入。
@@ -845,19 +870,21 @@ function drawBlock(b,t,th){
     const sk0=b._sk0!==undefined?b._sk0:b._tl-1.15;
     if(t<sk0)return;
     const ik=easeIO(clamp((t-sk0)/Math.max(b._tl-sk0,0.2),0,1));
+    /* 浅色页面用浅色骨架槽（同 drawLayerWell 的自适应），避免白底上先浮出黑块 */
+    const lightSk=(b._bgLum||0)>=150;
     ctx.save();
     ctx.beginPath();ctx.rect(x,y,Math.max(b.w*ik,2),Math.max(b.h*ik,2));ctx.clip();
-    /* 层框先以半透明黑凹槽出现：素材稍后从这个黑框底下升上来 */
-    ctx.fillStyle="rgba(5,6,12,.75)";rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
+    /* 层框先以半透明凹槽出现：素材稍后从这个槽底下升上来 */
+    ctx.fillStyle=lightSk?"rgba(236,238,244,.95)":"rgba(5,6,12,.75)";rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
     ctx.globalAlpha=0.4+0.2*Math.sin(t*4+b.x);
-    ctx.fillStyle=th.skel;rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
+    ctx.fillStyle=lightSk?"#eef0f6":th.skel;rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.fill();
     ctx.globalAlpha=0.9;
-    ctx.strokeStyle=th.skelLn;ctx.lineWidth=1.3;ctx.setLineDash([7,6]);
+    ctx.strokeStyle=lightSk?"#c4c9d8":th.skelLn;ctx.lineWidth=1.3;ctx.setLineDash([7,6]);
     ctx.lineDashOffset=-t*46;
     rr(ctx,x,y,b.w,b.h,b.rad||2);ctx.stroke();
     ctx.setLineDash([]);ctx.lineDashOffset=0;
     ctx.globalAlpha=0.45+0.3*ik;
-    ctx.fillStyle=th.skelLn;ctx.font="500 13px Inter,'PingFang SC',sans-serif";
+    ctx.fillStyle=lightSk?"#9aa0b4":th.skelLn;ctx.font="500 13px Inter,'PingFang SC',sans-serif";
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.fillText(b.label||TYPE_LABEL[b.type]||b.type,x+b.w/2,y+b.h/2);
     ctx.restore();return;
@@ -909,7 +936,7 @@ function drawBlock(b,t,th){
       if(b.kind!=="text"&&b.kind!=="txt"){
         if(!drawCrop(x,y,b.w,b.h)){ctx.fillStyle=th.skel;ctx.fillRect(x,y,b.w,b.h)}
       }else{
-        ctx.fillStyle="rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
+        ctx.fillStyle=(b._bgLum||0)>=150?"rgba(246,247,251,.85)":"rgba(8,9,16,.75)";ctx.fillRect(x,y,b.w,b.h);
       }
       ctx.restore();
       ctx.restore();
@@ -2714,7 +2741,7 @@ function extractLayout(d,host){
   const win=d.defaultView;
   const vw=Math.max(320,Math.min(2200,Math.round(d.documentElement.scrollWidth||1280)));
   /* 截图实际宽度：坐标一律按 capW 裁剪，横向溢出的元素不去截图外取像素 */
-  const capW=Math.min(vw,1280);
+  const capW=Math.min(vw,1600);
   const docH=Math.max(600,Math.min(16000,Math.round(Math.max(
     d.body.scrollHeight,d.documentElement.scrollHeight,d.body.getBoundingClientRect().height)||900)));
   const skip=new Set(["script","style","noscript","iframe","svg","path","br","hr","meta","link","head","title","option","source","picture"]);
