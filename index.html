@@ -243,7 +243,7 @@ function layerZ(b){
 }
 let seed=7;
 /* 构建版本号：每次部署必须更新（用户靠它确认拿到的是最新版） */
-const CF_VER="v3.19 · 1109l";
+const CF_VER="v3.19 · 1109m";
 console.log("[CursorForge] "+CF_VER);
 const NAMES=["Mia","Leo","Zoe","Ken","Ada","Sam","Ivy","Max","Nia","Ray","Tia","Oli","Uma","Ben","Sky","Eve","Jin","Lou","Ana","Gus","Kai","Mona","Pia","Ted","Rex","Fay","Dot","Vic","Zed","Nox","Luz","Ari","Bo","Cy","Dee","Eli","Fox","Gia","Hal"];
 const CCOLORS=["#6c5cff","#ff7a59","#22c07d","#f0a429","#e24b8d","#29a8e0","#8bc34a","#ff5c5c","#00b8a9","#b56cff","#f2724d","#4dd0b1","#ff9de2","#7d8cff","#ffd166","#5ce1e6","#c084fc","#a3e635","#fb7185","#38bdf8","#fdba74","#34d399","#f472b6","#a78bfa","#facc15","#2dd4bf","#f87171","#93c5fd","#c4b5fd","#86efac","#fcd34d","#67e8f9","#f9a8d4","#bef264","#fdba74","#a5b4fc"];
@@ -1690,7 +1690,7 @@ function drawCursor(c,t,th,now){
     while(arr.length&&now-arr[0].t>TW)arr.shift();
     ctx.save();
     for(let i=1;i<arr.length;i++){
-      const a=clamp(1-(now-arr[i].t)/TW,0,1)*0.34*uiA;
+      const a=clamp(1-(now-arr[i].t)/TW,0,1)*0.5*uiA;
       ctx.globalAlpha=a;ctx.strokeStyle=c.color;ctx.lineWidth=P.tline;ctx.lineCap="round";
       ctx.beginPath();ctx.moveTo(arr[i-1].x,arr[i-1].y);ctx.lineTo(arr[i].x,arr[i].y);ctx.stroke();
     }
